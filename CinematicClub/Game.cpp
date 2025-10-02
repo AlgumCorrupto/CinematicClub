@@ -16,18 +16,45 @@ using namespace sr2::math;
 bool Game::frozen = false;
 unsigned int Game::car_base = NULL;
 unsigned int Game::routine_address = NULL;
+unsigned char Game::car_to_select = 1;
 
 void Game::Init() {
     Game::car_base = NULL;
     Game::Detect();
 }
 
+void Game::Increment_car_to_select() {
+    if (car_to_select < 255)
+        car_to_select++;
+    else
+		car_to_select = 255;
+    Game::GetCarBase();
+
+    printf("Current selected opponent index: %d\n", car_to_select);
+}
+
+void Game::Decrement_car_to_select() {
+    if (car_to_select > 0)
+        car_to_select--;
+    else
+		car_to_select = 0;
+    Game::GetCarBase();
+    printf("Current selected opponent index: %d\n", car_to_select);
+}
+
+
 
 void Game::Loop() {
+    Sleep(33);
+
     // Toggle camera freeze/unfreeze
     if (GetAsyncKeyState(VK_NUMPAD1)) Game::CameraFreeze();
     if (GetAsyncKeyState(VK_NUMPAD2)) Game::CameraUnfreeze();
-    Sleep(33);
+
+    // quick and dirty fix if the car to transform is the opponent
+    if (GetAsyncKeyState('O') & 1) Game::Decrement_car_to_select();
+    if (GetAsyncKeyState('P') & 1) Game::Increment_car_to_select();
+
     if (frozen) {
         Playa::Loop();
 
@@ -76,10 +103,11 @@ size_t FindPattern(const std::vector<uint8_t>& pattern, int idx) {
 
 void Game::GetCarBase() {
     //std::vector<uint8_t> cam_pattern = { 0x18, 0x04, 0x63, 0x00 };
-
     //Game::car_base = FindPattern({ 0x00, 0x62, 0x2D, 0xF8 }, 1);
-    Game::car_base = FindPattern({ 0x00, 0x62, 0x76, 0x30 }, 1);
-
+    Game::car_base = FindPattern({ 0x00, 0x62, 0x76, 0x30 }, car_to_select + 1);
+    if (car_base == 0) {
+        car_to_select = 0;
+    }
 }
 
 void Game::CameraUnfreeze() {

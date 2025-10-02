@@ -9,11 +9,15 @@ public:
     static unsigned int car_base;// camera 4x4 matrix base address is stored here
 
     static bool frozen;
+    static unsigned char car_to_select;
 
     static void Init();             // initializes the game
     static void GetCarBase();    // fetches the camera 4x4 matrix base address
     static void CameraFreeze();     // freezes the camera
     static void CameraUnfreeze();   // unfreezes the camera
+
+    static void Increment_car_to_select();
+    static void Decrement_car_to_select();
 
     static void Loop();
 

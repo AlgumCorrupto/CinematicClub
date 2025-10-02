@@ -14,7 +14,13 @@ using namespace PlayStation2;
 DWORD WINAPI ClientThread(LPVOID hInstance) {
     running = InitCDK();
     Game::Init();
-    printf("Hello World\n");
+    printf("AlgumCorrupto presents...................\n");
+	printf("=========================================\n");
+    printf("= FlyHack v1 from CinematicClub modpack =\n");
+    printf("=========================================\n");
+
+    printf("\n\nMain repo: https://github.com/AlgumCorrupto/CinematicClub\n");
+
     while (running) {
         Game::Loop();
         if (GetAsyncKeyState(VK_END))     running = false;

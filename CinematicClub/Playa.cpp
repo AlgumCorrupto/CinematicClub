@@ -28,14 +28,7 @@ mat3x4f Playa::output{};
 
 bool frozen = false;
 
-const float Playa::accel = 0.05f;
-const float Playa::maxSpeed = 1.0f;
-const float Playa::damping = 0.9f;
-const float Playa::mouseSpeed = 0.01f;
-const float Playa::rotSpeed = 0.1f;
-const float Playa::moveSpeed = 0.1f; // units per frame
-
-
+float Playa::moveSpeed = 0.5f; // units per frame
 
 float Playa::yaw = 0.0f;
 float startYaw = 0.0f;
@@ -85,9 +78,11 @@ void Playa::ProcessEvents() {}
 
 void Playa::Loop()
 {
-    // constant move speed
-    float moveSpeed = .5f;
+	// move speed adjust
+    if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
+    if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
 
+	// move car forward/back/left/right
     vec3f forward = { sin(yaw), 0, cos(yaw) };
     if (GetAsyncKeyState('S') & 0x8000) output[3] += forward * moveSpeed;
     if (GetAsyncKeyState('W') & 0x8000) output[3] -= forward * moveSpeed;
@@ -96,14 +91,27 @@ void Playa::Loop()
     if (GetAsyncKeyState('A') & 0x8000) output[3] -= right * moveSpeed;
     if (GetAsyncKeyState('D') & 0x8000) output[3] += right * moveSpeed; 
 
+	// move car up/down
     if (GetAsyncKeyState('F') & 0x8000) output[3][1] -= moveSpeed;
     if (GetAsyncKeyState('R') & 0x8000) output[3][1] += moveSpeed;
 
+	// rotate car left/right
     float rotSpeed = 0.1f; // radians per frame
-
     if (GetAsyncKeyState('E') & 0x8000) yaw -= rotSpeed;
     if (GetAsyncKeyState('Q') & 0x8000) yaw += rotSpeed;
 
     rotation_y(output, yaw);
 }
 
+void Playa::IncrementMoveSpeed() {
+    moveSpeed += 0.01f;
+
+    printf("Move speed: %.2f\n", moveSpeed);
+}
+
+void Playa::DecrementMoveSpeed() {
+	moveSpeed -= 0.01f;
+	if (moveSpeed < 0.00f) moveSpeed = 0.00f;
+
+    printf("Move speed: %.2f\n", moveSpeed);
+}
