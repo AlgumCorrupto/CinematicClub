@@ -1,5 +1,5 @@
 # CinematicClub
-Modpacks consisting of DLL hacks to make cinematics in MidnightClub 3 Dub Edition Remix
+Modpack consisting of DLL hacks to make cinematics in MidnightClub 3 Dub Edition Remix
 
 ## Status
 
