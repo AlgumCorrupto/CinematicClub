@@ -147,7 +147,14 @@ void Game::GetCamBase() {
 #ifdef DUB_EDITION
     Game::cam_base = FindPattern({ 0x00, 0x63, 0x04, 0x18 }, 2) + 0x010;
 #elif defined DUB_EDITION_REMIX
-    Game::cam_base = FindPattern({ 0x00, 0x00, 0x6B, 0x60 }, 2) + 0x1EC;
+    std::vector<size_t> candidates;
+    candidates = FindAllPatterns({ 0x00, 0x00, 0x6B, 0x60 }); // +0x1EC;
+    for (auto addr : candidates) {
+        if(PS2Memory::ReadEE<unsigned int>(addr + (0x10 - 0x4)) == 0xCDCDCDCD) {
+            Game::cam_base = addr + 0x1EC;
+            break;
+		}
+    }
     // find all fov locations
     fov_bases.clear();
     auto matches = FindAllPatterns({ 0x00, 0x63, 0x4C, 0xB0 });
