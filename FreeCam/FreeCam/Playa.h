@@ -34,7 +34,7 @@ public:
 
     static bool frozen;
 
-    static void Init(int cam_address, int fov_address); // load input matrix from memory
+    static void Init(int cam_address); // load input matrix from memory
     static void Loop();                 // update movement each frame
 
     static void IncrementMoveSpeed();

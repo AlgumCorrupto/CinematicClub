@@ -4,7 +4,8 @@ class Game
 public:
 	const static unsigned int camRoutine;            // offset to the routine that return pointer to camera 3x4 matrix
     const static unsigned int fovInstruction;        // offset to the instruction that sets the fov
-    const static unsigned int unexplored_memory;
+    const static unsigned int unusedMemory1;
+    const static unsigned int unusedMemory2;
 
 	static POINT lockCenter;
 	static HWND gameWindow;

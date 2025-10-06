@@ -22,7 +22,6 @@ std::vector<float> Game::fov_bases = {};
 bool Game::cinematicMode = false;
 bool Game::mouseLocked = false;
 HWND Game::gameWindow;
-
 POINT Game::lockCenter;
 
 #ifdef DUB_EDITION
@@ -31,13 +30,25 @@ POINT Game::lockCenter;
 //const unsigned int Game::fovInstruction = 0x0051C9A0;
 #elif defined DUB_EDITION_REMIX
 const unsigned int Game::camRoutine = 0x515790;
-const unsigned int Game::unexplored_memory = 0x001A0150;
-const unsigned int Game::fovInstruction = 0x0051C9A0;
+const unsigned int Game::unusedMemory1 = 0x001A0150; // used to store our camera matrix
+const unsigned int Game::unusedMemory2 = 0x001A001C; // used to store custom instructions
+const unsigned int Game::fovInstruction = 0x0031F2A4;
 #endif
+//0x001A0150 + 0x10 * 0x4
 
 void Game::Init() {
 	gameWindow = FindWindowA(NULL, "Midnight Club 3 - DUB Edition Remix");
     Game::cam_base = NULL;
+
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 0 * sizeof(unsigned int), 0x3C08001A);
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 1 * sizeof(unsigned int), 0x35080190);
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 2 * sizeof(unsigned int), 0x8D090000); //  lw $t1, 0($t0)    # Load word from address in $t0 to $at
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 3 * sizeof(unsigned int), 0x44896000); // mtc1 $t1, $f12    # Move from $at to $f12
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 4 * sizeof(unsigned int), 0x92020048);
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 5 * sizeof(unsigned int), 0x03E00008);
+    PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 6 * sizeof(unsigned int), 0x00000000);
+    PCSX2::recResetEE_stub();
+
 }
 
 static bool KeyPressedOnce(int vk) {
@@ -68,18 +79,14 @@ void Game::Loop() {
         for (int row = 0; row < 4; row++) {        // rotation rows
             for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
                 PS2Memory::WriteEE<float>(
-                    unexplored_memory + (row * 3 + col) * sizeof(float),
+                    unusedMemory1 + (row * 3 + col) * sizeof(float),
                     Playa::output[row][col]
                 );
             }
          }
-		// write fov
-        for (const auto& fov_addr : fov_bases) {
-            PS2Memory::WriteEE<float>(fov_addr, Playa::fov);
-        }
+        PS2Memory::WriteEE(unusedMemory1 + 16 * 4, Playa::fov);
     }
 }
-
 
 bool MatchPattern(size_t addr, const std::vector<uint8_t>& pattern) {
     for (size_t i = 0; i < pattern.size(); i++) {
@@ -187,7 +194,7 @@ void Game::CameraUnfreeze() {
     PS2Memory::WriteEE<unsigned int>(camRoutine + 2 * sizeof(unsigned int), 0x9064007C);
     PS2Memory::WriteEE<unsigned int>(camRoutine + 3 * sizeof(unsigned int), 0x24620040);
     PS2Memory::WriteEE<unsigned int>(camRoutine + 4 * sizeof(unsigned int), 0x24630010);
-    PS2Memory::WriteEE(fovInstruction, 0xE60C0088);
+    PS2Memory::WriteEE(fovInstruction, 0xC46C0088);
 
     PCSX2::recResetEE_stub();
 	UnlockAndShowMouse();
@@ -197,7 +204,7 @@ void Game::CameraUnfreeze() {
 void Game::CameraFreeze() {
     printf("Frozen camera\n");
     Game::GetCamBase();
-    Playa::Init(Game::cam_base, Game::fov_bases[0]);
+    Playa::Init(Game::cam_base);
 
     auto mem = CGlobals::g_memory;
 	// reroute camera matrix pointer to our own matrix
@@ -207,12 +214,10 @@ void Game::CameraFreeze() {
 #elif defined DUB_EDITION_REMIX
     PS2Memory::WriteEE<unsigned int>(camRoutine + 1 * sizeof(unsigned int), 0x3C02001A);
     PS2Memory::WriteEE<unsigned int>(camRoutine + 2 * sizeof(unsigned int), 0x34420150);
+    PS2Memory::WriteEE<unsigned int>(fovInstruction, 0xc068007);
 #endif
     PS2Memory::WriteEE<unsigned int>(camRoutine + 3 * sizeof(unsigned int), 0x03e00008);
     PS2Memory::WriteEE<unsigned int>(camRoutine + 4 * sizeof(unsigned int), 0x00000000);
-
-	// nop-ing the instruction that sets the fov
-    PS2Memory::WriteEE(fovInstruction, 0x00000000);
 
     PCSX2::recResetEE_stub();
 

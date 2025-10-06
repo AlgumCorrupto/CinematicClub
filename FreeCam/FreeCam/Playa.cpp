@@ -37,9 +37,9 @@ vec3f Playa::velocity(0.0f, 0.0f, 0.0f);
 const float Playa::accel = 0.2f;      // acceleration factor
 const float Playa::friction = 0.15f;  // friction factor
 
-float Playa::fov = 70.0f; // degrees
+float Playa::fov = 40.f; // degrees
 
-void Playa::Init(int cam_address, int fov_address)
+void Playa::Init(int cam_address)
 {
     for (int row = 0; row < 4; row++) {        // rotation rows
         for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
@@ -48,7 +48,7 @@ void Playa::Init(int cam_address, int fov_address)
             );
         }
     }
-    fov = PS2Memory::ReadEE<float>(fov_address);
+    fov = 40.f;
 
     yaw   = atan2f(input[2][0], input[2][2]);
     pitch = atan2f(-input[2][1], sqrtf(input[2][0] * input[2][0] + input[2][2] * input[2][2]));
