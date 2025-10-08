@@ -4,8 +4,8 @@ Modpack consisting of DLL hacks to make cinematics in MidnightClub 3 Dub Edition
 ## Status
 
 - [X] FlyHack
-- [ ] FreeCam
-- [ ] Toggle GUI
+- [X] FreeCam
+- [ ] Spectator mode
 - [ ] True speed indicator
 
 ## Dependencies
