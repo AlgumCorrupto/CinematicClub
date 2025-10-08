@@ -91,8 +91,6 @@ void Game::Init() {
 }
 
 void Game::CheckWhereVelocityIsStored() {
-    if (PS2Memory::ReadEE<unsigned int>(Game::playerBase) == 0x627760) return;
-
     auto candidates = FindAllPatterns({ 0x00, 0x62, 0x77, 0x60 });
     for (auto addr : candidates) {
         if (PS2Memory::ReadEE<unsigned int>(addr + 0x40) == 0x00628210) {

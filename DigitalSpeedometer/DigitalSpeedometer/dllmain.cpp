@@ -44,7 +44,7 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
     while (running) {
         try {
             if (executor.ShouldRun()
-                && PS2Memory::ReadEE<unsigned int>(Game::playerBase) != 0x62776)
+                && PS2Memory::ReadEE<unsigned int>(Game::playerBase) != 0x627760)
                     Game::CheckWhereVelocityIsStored();
 
             Game::Loop();
@@ -52,6 +52,7 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
         }
         catch (...) {}
     }
+    PS2Memory::WriteEE<unsigned int>(0x006F60B0, false); // disable debug display
 
     ShutdownCDK();
     FreeLibraryAndExitThread((HMODULE)hInstance, EXIT_SUCCESS);
