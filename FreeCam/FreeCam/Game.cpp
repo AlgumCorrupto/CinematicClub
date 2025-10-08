@@ -66,7 +66,24 @@ void Game::Loop() {
     if (KeyPressedOnce('P')) (!frozen) ? Game::CameraFreeze() : Game::CameraUnfreeze();
 
     // --- Toggle mouse lock ---
-    if (KeyPressedOnce('L')) mouseLocked = !mouseLocked;
+    if (KeyPressedOnce('L')) {
+        mouseLocked = !mouseLocked;
+        if (mouseLocked) {
+            // --- Get pwindow center ---
+            POINT center;
+            {
+                RECT rect;
+                GetClientRect(Game::gameWindow, &rect);
+                center.x = (rect.right - rect.left) / 2;
+                center.y = (rect.bottom - rect.top) / 2;
+                ClientToScreen(Game::gameWindow, &center);
+            }
+
+            // --- Read mouse position ---
+            POINT mousePos;
+            SetCursorPos(center.x, center.y);
+        }
+    }
 
     // --- Toggle cinematic mode ---
     if (KeyPressedOnce(VK_MENU)) cinematicMode = !cinematicMode;
@@ -223,7 +240,21 @@ void Game::CameraFreeze() {
 
     Game::frozen = true;
 	Game::mouseLocked = true;
+
 	Playa::moveSpeed = 0.5f;
+    // --- Get window center ---
+    POINT center;
+    {
+        RECT rect;
+        GetClientRect(Game::gameWindow, &rect);
+        center.x = (rect.right - rect.left) / 2;
+        center.y = (rect.bottom - rect.top) / 2;
+        ClientToScreen(Game::gameWindow, &center);
+    }
+
+    // --- Read mouse position ---
+    POINT mousePos;
+    SetCursorPos(center.x, center.y);
 }
 
 void Game::Detect() {

@@ -52,7 +52,26 @@ void Playa::Init(int cam_address)
 
     yaw   = atan2f(input[2][0], input[2][2]);
     pitch = atan2f(-input[2][1], sqrtf(input[2][0] * input[2][0] + input[2][2] * input[2][2]));
-    tilt  = atan2f(input[1][0], input[1][1]);
+
+    // --- Calculate forward and right vectors ---
+    vec3f forward = {
+        cosf(pitch) * sinf(yaw),
+        -sinf(pitch),
+        cosf(pitch) * cosf(yaw)
+    };
+
+    vec3f up = input[1]; // camera's up vector
+    vec3f worldUp = { 0, 1, 0 }; // world up
+
+    // Project worldUp onto the plane perpendicular to forward
+    vec3f projectedUp = worldUp - forward * forward.dot(worldUp);
+    projectedUp.normalize();
+
+    // Compute angle between camera up and projected world up
+    float tilt = atan2f(
+        forward.cross(up).dot(projectedUp), // sin component
+        up.dot(projectedUp)                 // cos component
+    );
 
     output = input; // copy to working transform
 }
