@@ -73,9 +73,6 @@ void Playa::Init(int base_address)
     output = input; // copy to working transform
 }
 
-
-void Playa::ProcessEvents() {}
-
 void Playa::Loop()
 {
 	// move speed adjust

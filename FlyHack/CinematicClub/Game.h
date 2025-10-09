@@ -14,7 +14,7 @@ public:
     static void Init();             // initializes the game
     static void GetCarBase();    // fetches the car 3x4 matrix base address
     static void CarFreeze();     // freezes the car
-    static void CameraUnfreeze();   // unfreezes the car
+    static void CarUnfreeze();   // unfreezes the car
 
     static void Increment_car_to_select();
     static void Decrement_car_to_select();

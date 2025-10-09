@@ -25,6 +25,7 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
         Game::Loop();
         if (GetAsyncKeyState(VK_END))     running = false;
     }
+	Game::CarUnfreeze();
     ShutdownCDK();
     FreeLibraryAndExitThread((HMODULE)hInstance, EXIT_SUCCESS);
 }
