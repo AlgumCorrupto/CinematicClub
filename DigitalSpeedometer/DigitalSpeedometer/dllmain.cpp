@@ -31,7 +31,6 @@ struct PeriodicExecutor {
 
 DWORD WINAPI ClientThread(LPVOID hInstance) {
     running = InitCDK();
-    Game::Init();
     printf("AlgumCorrupto presents...................\n");
     printf("====================================================\n");
     printf("= DigitalSpeedometer v1 from CinematicClub modpack =\n");
@@ -40,9 +39,14 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
     printf("\n\nMain repo: https://github.com/AlgumCorrupto/CinematicClub\n");
 
     PeriodicExecutor executor(10.0); // 10 seconds interval
+    Game::Init();
 
     while (running) {
         try {
+            Sleep(33); // roughly 30 FPS
+
+			if (PS2Memory::ReadEE<unsigned int>(0x6144BC) != 0x0000000) continue; // if game is loading, skip
+
             if (executor.ShouldRun()
                 && (PS2Memory::ReadEE<unsigned int>(Game::playerBase) != 0x627760)
                     || PS2Memory::ReadEE<unsigned int>(Game::velocityBase) != 0x6278F8)

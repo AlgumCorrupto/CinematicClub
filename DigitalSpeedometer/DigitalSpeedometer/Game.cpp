@@ -106,7 +106,6 @@ void Game::CheckWhereVelocityIsStored() {
         velocityBase = PS2Memory::ReadEE<unsigned int>(playerBase - 56);
         return;
     }
-
 }
 
 static bool KeyPressedOnce(int vk) {
@@ -118,6 +117,10 @@ static bool KeyPressedOnce(int vk) {
 }
 
 void Game::Loop() {
+	if (PS2Memory::ReadEE<unsigned int>(0x6144BC) != 0x00000000) return; // if game is loading, skip
+
+    if (velocityBase == 0 || PS2Memory::ReadEE<unsigned int>(velocityBase) != 0x6278F8) return;
+
     // Toggle speedConversion when ',' is pressed (once per press)
     if (KeyPressedOnce('M')) {
         speedConversion = (speedConversion == Conversion::mph) ? Conversion::kph : Conversion::mph;
@@ -128,8 +131,6 @@ void Game::Loop() {
 	}
 	if (KeyPressedOnce('B')) CheckWhereVelocityIsStored(); // manual re-check
 
-    Sleep(33); // roughly 30 FPS
-    if (PS2Memory::ReadEE<unsigned int>(velocityBase) != 0x6278F8) return;
 
     float velocity = PS2Memory::ReadEE<float>(velocityBase + 0xB0);
     char buffer[32] = {0}; // Allocate buffer with fixed size
