@@ -44,16 +44,17 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
     while (running) {
         try {
             if (executor.ShouldRun()
-                && PS2Memory::ReadEE<unsigned int>(Game::playerBase) != 0x627760)
-                    Game::CheckWhereVelocityIsStored();
+                && (PS2Memory::ReadEE<unsigned int>(Game::playerBase) != 0x627760)
+                    || PS2Memory::ReadEE<unsigned int>(Game::velocityBase) != 0x6278F8)
+                        Game::CheckWhereVelocityIsStored();
 
             Game::Loop();
             if (GetAsyncKeyState(VK_END))     running = false;
         }
         catch (...) {}
     }
-    PS2Memory::WriteEE<unsigned int>(0x006F60B0, false); // disable debug display
 
+    PS2Memory::WriteEE<unsigned int>(0x006F60B0, false); // disable debug display
     ShutdownCDK();
     FreeLibraryAndExitThread((HMODULE)hInstance, EXIT_SUCCESS);
 }

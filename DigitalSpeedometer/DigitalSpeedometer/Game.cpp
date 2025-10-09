@@ -83,11 +83,11 @@ namespace {
 
 void Game::Init() {
     WriteStringToEE(formatted_string_addr, "Digital Speedometer\nBy AlgumCorrupto"); // write string to EE memory
-    Sleep(1000);
-	Game::CheckWhereVelocityIsStored();
     PS2Memory::WriteEE<unsigned int>(0x006F60B0, true); // enable debug display
+    Sleep(2000);
+	Game::CheckWhereVelocityIsStored();
     PS2Memory::WriteEE<unsigned int>(0x0052DA40, 0x240500FF); // put the debug display slighty down
-    
+    PCSX2::recResetEE_stub();
 }
 
 void Game::CheckWhereVelocityIsStored() {
@@ -129,7 +129,7 @@ void Game::Loop() {
 	if (KeyPressedOnce('B')) CheckWhereVelocityIsStored(); // manual re-check
 
     Sleep(33); // roughly 30 FPS
-    if (velocityBase == 0) return;
+    if (PS2Memory::ReadEE<unsigned int>(velocityBase) != 0x6278F8) return;
 
     float velocity = PS2Memory::ReadEE<float>(velocityBase + 0xB0);
     char buffer[32] = {0}; // Allocate buffer with fixed size
