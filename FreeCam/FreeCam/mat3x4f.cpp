@@ -8,6 +8,19 @@
 
 namespace sr2 {
     namespace math {
+        mat3x4f lookAt(const vec3f& eye, const vec3f& center, const vec3f& up) {
+            vec3f f = (center - eye).normalized();
+            vec3f s = f.cross(up).normalized();
+            vec3f u = s.cross(f);
+
+            return {
+                { s.x, u.x, -f.x},
+                { s.y, u.y, -f.y},
+                { s.z, u.z, -f.z},
+                { -s.dot(eye), -u.dot(eye), f.dot(eye)}
+            };
+        }
+
         void identity(mat3x4f& m) {
             m.x = { 1.0f, 0.0f, 0.0f };
             m.y = { 0.0f, 1.0f, 0.0f };

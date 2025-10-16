@@ -54,6 +54,12 @@
     <ClInclude Include="CDK.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="OpponentCam.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Helpful.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -84,6 +90,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CDK.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OpponentCam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Helpful.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

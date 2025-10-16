@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{99f1c315-3303-4b12-b79a-4ef021a7cd7c}</ProjectGuid>
-    <RootNamespace>CinematicClub</RootNamespace>
+    <RootNamespace>FlyHack</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>flyhack</ProjectName>
   </PropertyGroup>

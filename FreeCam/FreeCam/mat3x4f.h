@@ -3,6 +3,7 @@
 
 namespace sr2 {
     namespace math {
+        mat3x4f lookAt(const vec3f& eye, const vec3f& center, const vec3f& up);
         void identity(mat3x4f& m);
         void identity_3x3(mat3x4f& m);
         void zero(mat3x4f& m);

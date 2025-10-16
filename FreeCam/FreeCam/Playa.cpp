@@ -15,43 +15,42 @@ using namespace sr2;
 using namespace sr2::math;
 
 // Statics
-mat3x4f Playa::input{};
-mat3x4f Playa::output{};
+mat3x4f FreeCam::transform{};
 
 bool frozen = false;
 
-float Playa::moveSpeed = 0.5f; // units per frame
-float Playa::mouseSensitivity = 0.002f; // radians per pixel
+float FreeCam::moveSpeed = 25.f; // units per frame
+float FreeCam::mouseSensitivity = 0.002f; // radians per pixel
 
-float Playa::yaw = 0.0f;
-float Playa::pitch = 0.0f;
-float Playa::tilt = 0.0f;
+float FreeCam::yaw = 0.0f;
+float FreeCam::pitch = 0.0f;
+float FreeCam::tilt = 0.0f;
 
 // --- Mouse look (FPS style with cinematic smoothing) ---
-float Playa::smoothed_dx = 0.0f;
-float Playa::smoothed_dy = 0.0f;
-const float Playa::smoothing = 0.1f;  // smaller = smoother motion
+float FreeCam::smoothed_dx = 0.0f;
+float FreeCam::smoothed_dy = 0.0f;
+const float FreeCam::smoothing = 0.1f;  // smaller = smoother motion
 
 // --- Smooth movement variables ---
-vec3f Playa::velocity(0.0f, 0.0f, 0.0f);
-const float Playa::accel = 0.2f;      // acceleration factor
-const float Playa::friction = 0.15f;  // friction factor
+vec3f FreeCam::velocity(0.0f, 0.0f, 0.0f);
+const float FreeCam::accel = 4.f;      // acceleration factor
+const float FreeCam::friction = 0.015f;  // friction factor
 
-float Playa::fov = 40.f; // degrees
+float FreeCam::fov = 40.f; // degrees
 
-void Playa::Init(int cam_address)
+void FreeCam::Init(int cam_address)
 {
     for (int row = 0; row < 4; row++) {        // rotation rows
         for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
-            input[row][col] = PS2Memory::ReadEE<float>(
+            transform[row][col] = PS2Memory::ReadEE<float>(
                 cam_address + (row * 3 + col) * sizeof(float)
             );
         }
     }
     fov = 40.f;
 
-    yaw   = atan2f(input[2][0], input[2][2]);
-    pitch = atan2f(-input[2][1], sqrtf(input[2][0] * input[2][0] + input[2][2] * input[2][2]));
+    yaw   = atan2f(transform[2][0], transform[2][2]);
+    pitch = atan2f(-transform[2][1], sqrtf(transform[2][0] * transform[2][0] + transform[2][2] * transform[2][2]));
 
     // --- Calculate forward and right vectors ---
     vec3f forward = {
@@ -60,7 +59,7 @@ void Playa::Init(int cam_address)
         cosf(pitch) * cosf(yaw)
     };
 
-    vec3f up = input[1]; // camera's up vector
+    vec3f up = transform[1]; // camera's up vector
     vec3f worldUp = { 0, 1, 0 }; // world up
 
     // Project worldUp onto the plane perpendicular to forward
@@ -72,13 +71,11 @@ void Playa::Init(int cam_address)
         forward.cross(up).dot(projectedUp), // sin component
         up.dot(projectedUp)                 // cos component
     );
-
-    output = input; // copy to working transform
 }
 
-void Playa::Loop()
+void FreeCam::Loop()
 {
-    const float fovMultiplier = 0.5f;
+    const float fovMultiplier = 25.f;
     float boost = 1;
     // boost by pressing shift
     if (GetAsyncKeyState(VK_SHIFT) & 0x8000) boost = 5.0f;
@@ -87,15 +84,15 @@ void Playa::Loop()
     if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
     if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
 	// mouse sensitivity adjust
-	if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) mouseSensitivity -= 0.0001f;
-	if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) mouseSensitivity += 0.0001f;
+	if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) mouseSensitivity -= 0.0001f * Game::deltaTime;
+	if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) mouseSensitivity += 0.0001f * Game::deltaTime;
 	// fov adjust
-    if (GetAsyncKeyState('Z') & 0x8000) fov += fovMultiplier;
-    if (GetAsyncKeyState('X') & 0x8000) fov -= fovMultiplier;
+    if (GetAsyncKeyState('Z') & 0x8000) fov += fovMultiplier * Game::deltaTime;
+    if (GetAsyncKeyState('X') & 0x8000) fov -= fovMultiplier * Game::deltaTime;
 
 	if (GetAsyncKeyState('O') & 0x8000) tilt = 0.0; // reset tilt
-	if (GetAsyncKeyState('Q') & 0x8000) tilt += 0.02f; // roll left
-	if (GetAsyncKeyState('E') & 0x8000) tilt -= 0.02f; // roll right
+	if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
+	if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
     if(Game::mouseLocked == true){
         // --- Get window center ---
         POINT center;
@@ -162,7 +159,7 @@ void Playa::Loop()
     if (GetAsyncKeyState('F') & 0x8000) targetVel -= up * mv;
 
     // --- Smooth velocity towards target ---
-    velocity += (targetVel - velocity) * accel;
+    velocity += (targetVel - velocity) * accel * Game::deltaTime;
 
     // --- Apply friction when no input ---
     if (targetVel.lengthSq() < 0.0001f) {
@@ -171,7 +168,7 @@ void Playa::Loop()
     }
 
     // --- Apply movement ---
-    output[3] += velocity;
+    transform[3] += velocity;
 
     mat3x4f rotY, rotX, rotZ, combined;
 
@@ -200,19 +197,15 @@ void Playa::Loop()
     combined[0] = right;
     combined[1] = up;
     combined[2] = forward;
-    combined[3] = output[3]; // translation stays the same
-    output = combined;
+    combined[3] = transform[3]; // translation stays the same
+    transform = combined;
 }
 
-void Playa::IncrementMoveSpeed() {
-    moveSpeed += 0.05f;
-
-    printf("Move speed: %.2f\n", moveSpeed);
+void FreeCam::IncrementMoveSpeed() {
+    moveSpeed += 2.5f * Game::deltaTime;
 }
 
-void Playa::DecrementMoveSpeed() {
-	moveSpeed -= 0.05f;
+void FreeCam::DecrementMoveSpeed() {
+	moveSpeed -= 2.5f * Game::deltaTime;
 	if (moveSpeed < 0.00f) moveSpeed = 0.00f;
-
-    printf("Move speed: %.2f\n", moveSpeed);
 }

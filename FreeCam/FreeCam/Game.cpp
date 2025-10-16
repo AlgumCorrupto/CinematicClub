@@ -5,11 +5,10 @@
 #include "mat3x4f.h"
 #include "types.h"
 #include <vector>
-//lui  $v0, 0x001A # load upper 16 bits->$v0 = 0x001A0150
-//ori  $v0, $v0, 0x0150  # set lower 16 bits->$v0 = 0x001A0150
-//jr   $ra
-//nop
-
+#include "OpponentCam.h"
+#include "Helpful.h"
+#include <chrono>
+#include <thread>
 
 using namespace PlayStation2;
 
@@ -23,6 +22,13 @@ bool Game::cinematicMode = false;
 bool Game::mouseLocked = false;
 HWND Game::gameWindow;
 POINT Game::lockCenter;
+mat3x4f Game::cameraTransform;
+Game::Mode Game::mode = Game::Mode::unfrozen;
+float Game::fov = 40.f;
+float Game::toSleep = 33.f;
+using clockq = std::chrono::steady_clock;
+static auto lastTime = clockq::now();
+float Game::deltaTime = 0;
 
 #ifdef DUB_EDITION
 //const unsigned int Game::routine_address = 0x511da0;
@@ -34,7 +40,35 @@ const unsigned int Game::unusedMemory1 = 0x001A0150; // used to store our camera
 const unsigned int Game::unusedMemory2 = 0x001A001C; // used to store custom instructions
 const unsigned int Game::fovInstruction = 0x0031F2A4;
 #endif
-//0x001A0150 + 0x10 * 0x4
+
+void Game::NextState() {
+    // unfrozen -> opponent -> free -> unfrozen
+    switch(mode) {
+    case Mode::unfrozen:
+        Game::GetCamBase();
+        if (OrbitCam::Init(Game::cam_base) == false) {
+            mode = Mode::opponent;
+            goto next;
+        }
+        toSleep = 0.f;
+        CameraFreeze();
+        mode = Mode::opponent;
+        break;
+    case Mode::opponent:
+        Game::GetCamBase();
+        FreeCam::Init(Game::cam_base);
+        toSleep = 33.f;
+        CameraFreeze();
+        mode = Mode::free;
+        break;
+    case Mode::free:
+        CameraUnfreeze();
+        mode = Mode::unfrozen;
+    }
+    return;
+next:
+    NextState();
+}
 
 void Game::Init() {
 	gameWindow = FindWindowA(NULL, "Midnight Club 3 - DUB Edition Remix");
@@ -48,25 +82,15 @@ void Game::Init() {
     PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 5 * sizeof(unsigned int), 0x03E00008);
     PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 6 * sizeof(unsigned int), 0x00000000);
     PCSX2::recResetEE_stub();
-
 }
-
-static bool KeyPressedOnce(int vk) {
-    static SHORT lastState[256] = {};
-    SHORT current = GetAsyncKeyState(vk);
-    bool pressed = (current & 0x1) && !(lastState[vk] & 0x1);
-    lastState[vk] = current;
-    return pressed;
-}
-
 
 void Game::Loop() {
 
     // --- Toggle camera freeze/unfreeze ---
-    if (KeyPressedOnce('P')) (!frozen) ? Game::CameraFreeze() : Game::CameraUnfreeze();
+    if (Helpful::KeyPressedOnce('P')) NextState();
 
     // --- Toggle mouse lock ---
-    if (KeyPressedOnce('L')) {
+    if (Helpful::KeyPressedOnce('L')) {
         mouseLocked = !mouseLocked;
         if (mouseLocked) {
             // --- Get pwindow center ---
@@ -86,84 +110,39 @@ void Game::Loop() {
     }
 
     // --- Toggle cinematic mode ---
-    if (KeyPressedOnce(VK_MENU)) cinematicMode = !cinematicMode;
+    if (Helpful::KeyPressedOnce(VK_TAB)) cinematicMode = !cinematicMode;
+
+    auto now = clockq::now();
+    std::chrono::duration<float> delta = now - lastTime;
+    lastTime = now;
+    Game::deltaTime = delta.count(); // seconds since last frame
 
     if (frozen) {
-        Playa::Loop();
-
         if (!cam_base) return; // sanity check
 
+        switch (mode) {
+        case Mode::free:
+            FreeCam::Loop();
+            cameraTransform = FreeCam::transform;
+            fov = FreeCam::fov;
+            break;
+        case Mode::opponent:
+            OrbitCam::Loop();
+            cameraTransform = OrbitCam::transform;
+            fov = OrbitCam::fov;
+            break;
+        }
         for (int row = 0; row < 4; row++) {        // rotation rows
             for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
                 PS2Memory::WriteEE<float>(
                     unusedMemory1 + (row * 3 + col) * sizeof(float),
-                    Playa::output[row][col]
+                    cameraTransform[row][col]
                 );
             }
-         }
-        PS2Memory::WriteEE(unusedMemory1 + 16 * 4, Playa::fov);
-    }
-}
-
-bool MatchPattern(size_t addr, const std::vector<uint8_t>& pattern) {
-    for (size_t i = 0; i < pattern.size(); i++) {
-        try {
-            if (PS2Memory::ReadEE<uint8_t>(addr + i) != pattern[i])
-                return false;
         }
-        catch (...) {
-            return false; // out-of-bounds
-        }
-    }
-    return true;
-}
-
-size_t FindPattern(const std::vector<uint8_t>& pattern, int idx) {
-    // Make a reversed copy
-    std::vector<uint8_t> pat(pattern.rbegin(), pattern.rend());
-
-    constexpr size_t EE_MEM_SIZE = 0x2000000; // 32 MB
-    for (size_t k = 0; k <= EE_MEM_SIZE - pat.size(); k++) {
-        if (MatchPattern(k, pat) && idx == 1)
-            return k;
-        else if (MatchPattern(k, pat))
-            idx--;
-    }
-    return 0;
-}
-std::vector<size_t> FindAllPatterns(const std::vector<uint8_t>& pattern) {
-    std::vector<size_t> matches;
-    if (pattern.empty()) return matches;
-
-    // Reverse pattern if your MatchPattern expects reversed (remove if not)
-    std::vector<uint8_t> pat(pattern.rbegin(), pattern.rend());
-
-    constexpr size_t EE_MEM_SIZE = 0x2000000; // 32 MB
-    const size_t patSize = pat.size();
-
-    for (size_t addr = 0; addr <= EE_MEM_SIZE - patSize; addr++) {
-        bool match = true;
-
-        for (size_t i = 0; i < patSize; i++) {
-            uint8_t byte = 0;
-            try {
-                byte = PS2Memory::ReadEE<uint8_t>(addr + i);
-            }
-            catch (...) {
-                match = false;
-                break;
-            }
-
-            if (byte != pat[i]) {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) matches.push_back(addr);
+        PS2Memory::WriteEE(unusedMemory1 + 16 * 4, fov);
     }
 
-    return matches;
 }
 
 
@@ -172,7 +151,7 @@ void Game::GetCamBase() {
     Game::cam_base = FindPattern({ 0x00, 0x63, 0x04, 0x18 }, 2) + 0x010;
 #elif defined DUB_EDITION_REMIX
     std::vector<size_t> candidates;
-    candidates = FindAllPatterns({ 0x00, 0x00, 0x6B, 0x60 }); // +0x1EC;
+    candidates = Helpful::FindAllPatterns({ 0x00, 0x00, 0x6B, 0x60 }); // +0x1EC;
     for (auto addr : candidates) {
         if(PS2Memory::ReadEE<unsigned int>(addr + (0x10 - 0x4)) == 0xCDCDCDCD) {
             Game::cam_base = addr + 0x1EC;
@@ -181,11 +160,7 @@ void Game::GetCamBase() {
     }
     // find all fov locations
     fov_bases.clear();
-    auto matches = FindAllPatterns({ 0x00, 0x63, 0x4C, 0xB0 });
-    printf("Found %zu matches:\n", matches.size());
-    for (auto addr : matches) {
-        printf("  0x%08zX\n", addr);
-    }
+    auto matches = Helpful::FindAllPatterns({ 0x00, 0x63, 0x4C, 0xB0 });
 
     // Example: Use them to populate fov_bases
     for (auto addr : matches) {
@@ -204,7 +179,6 @@ void Game::GetCamBase() {
 }
 
 void Game::CameraUnfreeze() {
-    printf("Unfrozen camera\n");
     auto mem = CGlobals::g_memory;
 
     PS2Memory::WriteEE<unsigned int>(camRoutine + 1 * sizeof(unsigned int), 0x8C430030);
@@ -219,9 +193,7 @@ void Game::CameraUnfreeze() {
 }
 
 void Game::CameraFreeze() {
-    printf("Frozen camera\n");
-    Game::GetCamBase();
-    Playa::Init(Game::cam_base);
+
 
     auto mem = CGlobals::g_memory;
 	// reroute camera matrix pointer to our own matrix
@@ -241,7 +213,7 @@ void Game::CameraFreeze() {
     Game::frozen = true;
 	Game::mouseLocked = true;
 
-	Playa::moveSpeed = 0.5f;
+	FreeCam::moveSpeed = 0.5f;
     // --- Get window center ---
     POINT center;
     {
@@ -279,7 +251,6 @@ void Game::LockAndHideMouse(HWND hwnd) {
     RECT clipRect = { center.x, center.y, center.x + 1, center.y + 1 };
     ClipCursor(&clipRect);
 }
-
 
 void Game::UnlockAndShowMouse() {
     // Release cursor and show it again

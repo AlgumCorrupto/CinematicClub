@@ -7,11 +7,10 @@
 
 using namespace sr2;
 
-class Playa
+class FreeCam
 {
 public:
-    static mat3x4f input;
-    static mat3x4f output;
+    static mat3x4f transform;
 
     static float moveSpeed;
 	static float mouseSensitivity;

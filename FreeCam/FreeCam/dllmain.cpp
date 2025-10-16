@@ -18,7 +18,8 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
     printf("\n\nMain repo: https://github.com/AlgumCorrupto/CinematicClub\n");
 
     while (running) {
-        Sleep(33);
+        if (PS2Memory::ReadEE<unsigned int>(0x6144BC) != 0x0000000) continue; // if game is loading, skip
+        Sleep(Game::toSleep);
         Game::Loop();
         if (GetAsyncKeyState(VK_END))     running = false;
     }
