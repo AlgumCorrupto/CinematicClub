@@ -123,27 +123,31 @@ void Game::Loop() {
 
     // Toggle speedConversion when ',' is pressed (once per press)
     if (KeyPressedOnce('M')) {
-        speedConversion = (speedConversion == Conversion::mph) ? Conversion::kph : Conversion::mph;
+        speedConversion = (speedConversion == Conversion::mph) ? Conversion::kph : ((speedConversion == Conversion::kph) ? Conversion::ms : Conversion::mph);
     }
     if(KeyPressedOnce('N')) {
         active = !active;
         PS2Memory::WriteEE<unsigned int>(0x006F60B0, active); // enable debug display
 	}
 	if (KeyPressedOnce('B')) CheckWhereVelocityIsStored(); // manual re-check
-
-
     float velocity = PS2Memory::ReadEE<float>(velocityBase + 0xB0);
+    //float velocity = PS2Memory::ReadEE<float>(velocityBase + 0x80);
+    //float velocity = PS2Memory::ReadEE<float>(velocityBase + 0x148);
     char buffer[32] = {0}; // Allocate buffer with fixed size
+
 	velocity = fabs(velocity); // absolute value
     switch (speedConversion)
     {
     case Game::Conversion::mph:
         velocity *= 2.23694f;
-        snprintf(buffer, sizeof(buffer), "%04.0f mph", velocity); // safer alternative
+        snprintf(buffer, sizeof(buffer), "%3.0f mph", velocity); // safer alternative
         break;
     case Game::Conversion::kph:
         velocity *= 3.6f;
-        snprintf(buffer, sizeof(buffer), "%04.0f kmh", velocity);
+        snprintf(buffer, sizeof(buffer), "%3.0f kmh", velocity);
+        break;
+    case Game::Conversion::ms:
+        snprintf(buffer, sizeof(buffer), "%3.0f m/s", velocity);
         break;
     default:
         break;

@@ -43,7 +43,7 @@ DWORD WINAPI ClientThread(LPVOID hInstance) {
 
     while (running) {
         try {
-            Sleep(33); // roughly 30 FPS
+            Sleep(16); // roughly 60 FPS
 
 			if (PS2Memory::ReadEE<unsigned int>(0x6144BC) != 0x0000000) continue; // if game is loading, skip
 

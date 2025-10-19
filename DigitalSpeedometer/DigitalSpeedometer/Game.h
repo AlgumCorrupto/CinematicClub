@@ -7,7 +7,8 @@ public:
 	enum class Conversion
 	{
 		mph,
-		kph
+		kph,
+		ms
 	};
 	static Conversion speedConversion;
     static unsigned int velocityBase;
