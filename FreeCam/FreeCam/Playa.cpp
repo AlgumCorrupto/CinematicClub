@@ -34,7 +34,7 @@ const float FreeCam::smoothing = 0.1f;  // smaller = smoother motion
 // --- Smooth movement variables ---
 vec3f FreeCam::velocity(0.0f, 0.0f, 0.0f);
 const float FreeCam::accel = 4.f;      // acceleration factor
-const float FreeCam::friction = 0.015f;  // friction factor
+const float FreeCam::friction = 0.03f;  // friction factor
 
 float FreeCam::fov = 40.f; // degrees
 
@@ -98,7 +98,7 @@ void FreeCam::Loop()
         POINT center;
         {
             RECT rect;
-            GetClientRect(Game::gameWindow, &rect);
+            GetWindowRect(Game::gameWindow, &rect);
             center.x = (rect.right - rect.left) / 2;
             center.y = (rect.bottom - rect.top) / 2;
             ClientToScreen(Game::gameWindow, &center);

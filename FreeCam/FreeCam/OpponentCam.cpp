@@ -110,7 +110,7 @@ void OrbitCam::Loop() {
     if (Game::mouseLocked) {
         POINT center;
         RECT rect;
-        GetClientRect(Game::gameWindow, &rect);
+        GetWindowRect(Game::gameWindow, &rect);
         center.x = (rect.right - rect.left) / 2;
         center.y = (rect.bottom - rect.top) / 2;
         ClientToScreen(Game::gameWindow, &center);
