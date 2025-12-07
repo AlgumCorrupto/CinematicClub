@@ -302,7 +302,12 @@ void ParentedCam::Loop()
     combined[2] = forward; // camera local forward basis
     // combined[3] is the local translation (offset), but we'll handle it explicitly below
 
-    // --- Calculate forward vector from yaw/pitch (mouse) ---
+// --- Step 1: Vehicle basis ---
+    vec3f vehicleRight = targetTransform[0];
+    vec3f vehicleUp = targetTransform[1];
+    vec3f vehicleFwd = targetTransform[2];
+
+    // --- Step 2: Camera forward from yaw/pitch (after mouse) ---
     vec3f camForward = {
         cosf(pitch) * sinf(yaw),
         -sinf(pitch),
@@ -310,36 +315,41 @@ void ParentedCam::Loop()
     };
     camForward.normalize();
 
-    // --- Build right/up basis ---
+    // --- Step 3: Camera right/up ---
     vec3f camRight = { cosf(yaw), 0, -sinf(yaw) };
     vec3f camUp = camForward.cross(camRight).normalized();
 
-    // --- Apply vehicle rotation if parented ---
+    // --- Step 4: Apply tilt around forward ---
+    if (fabsf(tilt) > 0.0001f)
+    {
+        float c = cosf(tilt);
+        float s = sinf(tilt);
+        vec3f newRight = camRight * c + camUp * s;
+        vec3f newUp = camUp * c - camRight * s;
+        camRight = newRight;
+        camUp = newUp;
+    }
+
+    // --- Step 5: Transform to world space if vehicle-relative ---
+    vec3f worldRight, worldUp, worldForward, worldOffset;
     if (rotateWithVehicle)
     {
-        vec3f vehicleRight = targetTransform[0];
-        vec3f vehicleUp = targetTransform[1];
-        vec3f vehicleFwd = targetTransform[2];
+        worldRight = vehicleRight * camRight.x + vehicleUp * camRight.y + vehicleFwd * camRight.z;
+        worldUp = vehicleRight * camUp.x + vehicleUp * camUp.y + vehicleFwd * camUp.z;
+        worldForward = vehicleRight * camForward.x + vehicleUp * camForward.y + vehicleFwd * camForward.z;
 
-        // Rotate camera basis by vehicle basis
-        vec3f worldRight = vehicleRight * camRight.x + vehicleUp * camRight.y + vehicleFwd * camRight.z;
-        vec3f worldUp = vehicleRight * camUp.x + vehicleUp * camUp.y + vehicleFwd * camUp.z;
-        vec3f worldForward = vehicleRight * camForward.x + vehicleUp * camForward.y + vehicleFwd * camForward.z;
+        worldOffset = vehicleRight * offset[3].x +
+            vehicleUp * offset[3].y +
+            vehicleFwd * offset[3].z;
 
         transform[0] = worldRight;
         transform[1] = worldUp;
         transform[2] = worldForward;
-
-        // Offset in vehicle-local space
-        vec3f worldOffset =
-            vehicleRight * offset[3].x +
-            vehicleUp * offset[3].y +
-            vehicleFwd * offset[3].z;
-
         transform[3] = targetTransform[3] + worldOffset;
     }
     else
     {
+        // Free camera
         transform[0] = camRight;
         transform[1] = camUp;
         transform[2] = camForward;
