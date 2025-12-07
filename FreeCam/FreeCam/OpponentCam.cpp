@@ -22,7 +22,7 @@ float OrbitCam::tilt = 0.0f;
 
 float OrbitCam::smoothed_dx = 0.0f;
 float OrbitCam::smoothed_dy = 0.0f;
-const float OrbitCam::smoothing = .5f;
+const float OrbitCam::smoothing = .1f;
 
 vec3f OrbitCam::velocity(0.0f, 0.0f, 0.0f);
 const float OrbitCam::accel = 0.2f;
@@ -63,6 +63,7 @@ bool OrbitCam::Init(int cam_address)
 // Helper function to create look-at matrix
 mat3x4f createLookAt(const vec3f& eye, const vec3f& target, const vec3f& up)
 {
+
     vec3f zaxis = (eye - target).normalized(); // Changed: eye - target (look FROM eye TO target)
     vec3f xaxis = up.cross(zaxis).normalized();
     vec3f yaxis = zaxis.cross(xaxis);
@@ -82,9 +83,10 @@ float clamp(float value, float minVal, float maxVal) {
     if (value > maxVal) return maxVal;
     return value;
 }
-
+float OrbitCam::mouseElapsed = 0.f;
 void OrbitCam::Loop() {
     if (opponents.empty()) return;
+    mouseElapsed += Game::deltaTime;
 
     // Fix opponent cycling
     if (Helpful::KeyPressedOnce('Q')) {
@@ -110,7 +112,8 @@ void OrbitCam::Loop() {
     }
 
     // Mouse look handling
-    if (Game::mouseLocked) {
+    if (Game::mouseLocked && mouseElapsed > .033f) {
+		mouseElapsed = 0.f;
         POINT center;
         RECT rect;
         GetWindowRect(Game::gameWindow, &rect);
@@ -125,8 +128,8 @@ void OrbitCam::Loop() {
         float dy = static_cast<float>(mousePos.y - center.y);
 
         if (Game::cinematicMode) {
-            smoothed_dx += (dx - smoothed_dx) * smoothing * Game::deltaTime;
-            smoothed_dy += (dy - smoothed_dy) * smoothing * Game::deltaTime;
+            smoothed_dx += (dx - smoothed_dx) * smoothing;
+            smoothed_dy += (dy - smoothed_dy) * smoothing;
         }
         else {
             smoothed_dx = dx;

@@ -43,6 +43,7 @@ const float ParentedCam::friction = 1.0f;  // friction factor
 std::vector<size_t> ParentedCam::opponents = {};
 unsigned char ParentedCam::currentOpponent = 0;
 bool ParentedCam::rotateWithVehicle = true;
+float ParentedCam::mouseElapsed = 0.f;
 
 float ParentedCam::fov = 40.f; // degrees
 
@@ -143,6 +144,7 @@ void ParentedCam::SetOpponent(unsigned char index)
 
 void ParentedCam::Loop()
 {
+	mouseElapsed += Game::deltaTime;
     // Guard: if we have no opponents, don't attempt to index into the vector
     if (opponents.empty()) {
         return;
@@ -202,7 +204,8 @@ void ParentedCam::Loop()
     if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
     if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
 
-    if (Game::mouseLocked == true) {
+    if (Game::mouseLocked == true && mouseElapsed > .033f) {
+		mouseElapsed= 0.f;
         // --- Get window center ---
         POINT center;
         {

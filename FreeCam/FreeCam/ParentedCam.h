@@ -13,6 +13,7 @@ public:
 	static mat3x4f transform;
 	static mat3x4f offset;
 	static mat3x4f targetTransform; // transformation of the thing to look at and rotate around
+	static float mouseElapsed;
 
 	static std::vector<size_t> opponents;
 	static unsigned char currentOpponent;

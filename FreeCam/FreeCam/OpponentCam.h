@@ -15,6 +15,7 @@ public:
     static float distance;          // distance to keep the camera
     static float polar;             // polar angle
     static float azimuthal;         // azimuthal
+    static float mouseElapsed;
 
     static std::vector<size_t> opponents;
     static uint8_t currentOpponent;
