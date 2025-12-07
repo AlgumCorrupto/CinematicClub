@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "OpponentCam.h"
+#include "ParentedCam.h"
 #include "Helpful.h"
 #include "types.h"
 #include "mat3x4f.h"
@@ -42,9 +43,11 @@ bool OrbitCam::Init(int cam_address)
             );
         }
     }
+	transform = mat3x4f::identity;
 
     opponents = {};
-    currentOpponent = 0;
+    currentOpponent = ParentedCam::currentOpponent;
+    if (opponents.size() < currentOpponent) currentOpponent = 0;
 
     opponents = Helpful::FindAllPatterns({ 0x00, 0x62, 0x76, 0x30 });
     if (opponents.size() == 0) return false;

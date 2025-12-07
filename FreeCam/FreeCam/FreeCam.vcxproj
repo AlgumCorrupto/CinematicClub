@@ -146,6 +146,7 @@
     <ClInclude Include="mat4x4f.h" />
     <ClInclude Include="math.h" />
     <ClInclude Include="OpponentCam.h" />
+    <ClInclude Include="ParentedCam.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Playa.h" />
     <ClInclude Include="types.h" />
@@ -165,6 +166,7 @@
     <ClCompile Include="mat3x4f.cpp" />
     <ClCompile Include="mat4x4f.cpp" />
     <ClCompile Include="OpponentCam.cpp" />
+    <ClCompile Include="ParentedCam.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

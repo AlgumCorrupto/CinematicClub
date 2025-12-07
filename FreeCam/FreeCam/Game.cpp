@@ -9,6 +9,7 @@
 #include "Helpful.h"
 #include <chrono>
 #include <thread>
+#include "ParentedCam.h"
 
 using namespace PlayStation2;
 
@@ -47,7 +48,7 @@ void Game::NextState() {
     case Mode::unfrozen:
         Game::GetCamBase();
         if (OrbitCam::Init(Game::cam_base) == false) {
-            mode = Mode::opponent;
+            mode = Mode::parent;
             goto next;
         }
         toSleep = 0.f;
@@ -56,11 +57,18 @@ void Game::NextState() {
         break;
     case Mode::opponent:
         Game::GetCamBase();
+        ParentedCam::Init(Game::cam_base);
+        toSleep = 0.f;
+        CameraFreeze();
+        mode = Mode::parent;
+        break;
+    case Mode::parent:
+        Game::GetCamBase();
         FreeCam::Init(Game::cam_base);
-        toSleep = 33.f;
         CameraFreeze();
         mode = Mode::free;
-        break;
+		toSleep = 33.f;
+		break;
     case Mode::free:
         CameraUnfreeze();
         mode = Mode::unfrozen;
@@ -119,7 +127,6 @@ void Game::Loop() {
 
     if (frozen) {
         if (!cam_base) return; // sanity check
-
         switch (mode) {
         case Mode::free:
             FreeCam::Loop();
@@ -130,6 +137,11 @@ void Game::Loop() {
             OrbitCam::Loop();
             cameraTransform = OrbitCam::transform;
             fov = OrbitCam::fov;
+            break;
+        case Mode::parent:
+            ParentedCam::Loop();
+            cameraTransform = ParentedCam::transform;
+            fov = ParentedCam::fov;
             break;
         }
         for (int row = 0; row < 4; row++) {        // rotation rows
@@ -142,7 +154,6 @@ void Game::Loop() {
         }
         PS2Memory::WriteEE(unusedMemory1 + 16 * 4, fov);
     }
-
 }
 
 

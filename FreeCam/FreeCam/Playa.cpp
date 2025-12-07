@@ -9,6 +9,7 @@
 
 #include "Playa.h"
 #include "Game.h"
+#include "Helpful.h"
 
 using namespace PlayStation2;
 using namespace sr2;
@@ -35,6 +36,8 @@ const float FreeCam::smoothing = 0.1f;  // smaller = smoother motion
 vec3f FreeCam::velocity(0.0f, 0.0f, 0.0f);
 const float FreeCam::accel = 4.f;      // acceleration factor
 const float FreeCam::friction = 0.03f;  // friction factor
+std::vector<size_t> FreeCam::opponents = {};
+unsigned char FreeCam::currentOpponent = 0;
 
 float FreeCam::fov = 40.f; // degrees
 
@@ -71,6 +74,8 @@ void FreeCam::Init(int cam_address)
         forward.cross(up).dot(projectedUp), // sin component
         up.dot(projectedUp)                 // cos component
     );
+    opponents = Helpful::FindAllPatterns({ 0x00, 0x62, 0x76, 0x30 });
+	currentOpponent = 0;
 }
 
 void FreeCam::Loop()
@@ -83,12 +88,17 @@ void FreeCam::Loop()
     // move speed adjust
     if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
     if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
+
 	// mouse sensitivity adjust
 	if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) mouseSensitivity -= 0.0001f * Game::deltaTime;
 	if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) mouseSensitivity += 0.0001f * Game::deltaTime;
 	// fov adjust
     if (GetAsyncKeyState('Z') & 0x8000) fov += fovMultiplier * Game::deltaTime;
     if (GetAsyncKeyState('X') & 0x8000) fov -= fovMultiplier * Game::deltaTime;
+
+    if (Helpful::KeyPressedOnce('V')) DecrementCurrentOpponent();
+    if (Helpful::KeyPressedOnce('B')) DecrementCurrentOpponent();
+    if (Helpful::KeyPressedOnce('C')) MoveCurrentVehToCamera();
 
 	if (GetAsyncKeyState('O') & 0x8000) tilt = 0.0; // reset tilt
 	if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
@@ -146,6 +156,7 @@ void FreeCam::Loop()
     right.normalize();
 
     vec3f up = forward.cross(right);
+
     up.normalize();
 
     vec3f targetVel(0.0f, 0.0f, 0.0f);
@@ -208,4 +219,120 @@ void FreeCam::IncrementMoveSpeed() {
 void FreeCam::DecrementMoveSpeed() {
 	moveSpeed -= 2.5f * Game::deltaTime;
 	if (moveSpeed < 0.00f) moveSpeed = 0.00f;
+}
+
+void FreeCam::MoveCurrentVehToCamera() {
+    auto routine_address = Helpful::FindPattern({ 0x8D, 0x69, 0x00, 0x0C }, 1);
+#pragma region freeze car
+    // 004D76F4
+    // 28
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x28, 0x00000000);
+    // 3C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x3C, 0x00000000);
+    // 44
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x44, 0x00000000);
+    // 4C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x4C, 0x00000000);
+    // 54
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x54, 0x00000000);
+    // 5C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x5C, 0x00000000);
+    // 64
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x64, 0x00000000);
+    // 6C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x6C, 0x00000000);
+    // 74
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x74, 0x00000000);
+    // 7C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x7C, 0x00000000);
+    // 84
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x84, 0x00000000);
+    // 8C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x8C, 0x00000000);
+    // DC E7A40000
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0xDC, 0x00000000);
+    // 110 004D7804
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x110, 0x00000000);
+    // 140 E7A40000
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x140, 0x00000000);
+    // 148 E7A20004
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x148, 0x00000000);
+    // 14C E7A40010
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x14C, 0x00000000);
+    // 158 E7A10018
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x158, 0x00000000);
+    // 15C E7A10008
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x15C, 0x00000000);
+    // 168
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x168, 0x00000000);
+    // 17C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x17C, 0x00000000);
+    // 188
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x188, 0x00000000);
+
+
+    PCSX2::recResetEE_stub();
+#pragma endregion
+
+	Sleep(100);
+    for (int row = 0; row < 4; row++) {        // rotation rows
+        for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
+            PS2Memory::WriteEE<float>(
+                opponents[currentOpponent] + 0x10 + (row * 3 + col) * sizeof(float),
+				transform[row][col]
+            );
+        }
+    }
+    printf("current opponent : 0x%X moved to camera position\n", opponents[currentOpponent]);
+    Sleep(100);
+
+#pragma region unfreeze car
+    // 004D76F4
+// 28
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x28, 0xE5000000);
+    // 3C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x3C, 0xE5000004);
+    // 44
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x44, 0xE5010008);
+    // 4C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x4C, 0xE500000C);
+    // 54
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x54, 0xE4610004);
+    // 5C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x5C, 0xE4600008);
+    // 64
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x64, 0xE5010018);
+    // 6C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x6C, 0xE4800004);
+    // 74
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x74, 0xE4810008);
+    // 7C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x7C, 0xE5000024);
+    // 84
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x84, 0xE4E10004);
+    // 8C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x8C, 0xE4E00008);
+    // DC E7A40000
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0xDC, 0xE7A40000);
+    // 110 004D7804
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x110, 0x004D7804);
+    // 140 E7A40000
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x140, 0xE7A40000);
+    // 148 E7A20004
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x148, 0xE7A20004);
+    // 14C E7A40010
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x14C, 0xE7A40010);
+    // 158 E7A10018
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x158, 0x00000000);
+    // 15C E7A10008
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x15C, 0xE7A10008);
+    // 168
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x168, 0xE4400024);
+    // 17C
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x17C, 0xE4810004);
+    // 188
+    PS2Memory::WriteEE<unsigned int>(routine_address + 0x188, 0xE4820008);
+
+    PCSX2::recResetEE_stub();
+#pragma endregion
 }

@@ -14,7 +14,8 @@ public:
     static enum class Mode {
         unfrozen,
         free,
-        opponent
+        opponent,
+        parent
     } mode;
 
 	static POINT lockCenter;

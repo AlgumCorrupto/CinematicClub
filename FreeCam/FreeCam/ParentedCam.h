@@ -7,19 +7,22 @@
 
 using namespace sr2;
 
-class FreeCam
+class ParentedCam
 {
 public:
-    static mat3x4f transform;
+	static mat3x4f transform;
+	static mat3x4f offset;
+	static mat3x4f targetTransform; // transformation of the thing to look at and rotate around
+
 	static std::vector<size_t> opponents;
 	static unsigned char currentOpponent;
 
-    static float moveSpeed;
+	static float moveSpeed;
 	static float mouseSensitivity;
 
-    // State
-    static float velX, velY, velZ; // velocity components
-    static float yaw;              // rotation around Y axis
+	// State
+	static float velX, velY, velZ; // velocity components
+	static float yaw;              // rotation around Y axis
 	static float pitch;            // rotation around X axis
 	static float tilt;             // rotation around Z axis
 
@@ -33,13 +36,19 @@ public:
 
 	static float fov; // current field of view (degrees)
 
-    static bool frozen;
+	static bool frozen;
+	static bool rotateWithVehicle;
 
-    static void Init(int cam_address); // load input matrix from memory
-    static void Loop();                 // update movement each frame
+	static void Init(int cam_address); // load input matrix from memory
+	static void Loop();                 // update movement each frame
 
-    static void IncrementMoveSpeed();
-    static void DecrementMoveSpeed();
+	static void IncrementMoveSpeed();
+	static void DecrementMoveSpeed();
+
+	static void NextOpponent();
+	static void PreviousOpponent();
+
+	static void SetOpponent(unsigned char index);
 
 	static void IncrementCurrentOpponent() {
 		currentOpponent = (currentOpponent + 1) % opponents.size();
