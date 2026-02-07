@@ -43,6 +43,7 @@ unsigned char FreeCam::currentOpponent = 0;
 float FreeCam::fov = 40.f; // degrees
 float mouseElapsed = 33.f;
 static bool firstFrame = true;
+static const float NO_DAMPING_SPEED = 10.0;
 
 void FreeCam::Init(int cam_address)
 {
@@ -111,9 +112,10 @@ void FreeCam::Loop()
 	if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
 	if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
     mouseElapsed += Game::deltaTime;
-    // --- 3. Mouse look ---
+
+    // --- Mouse look ---
     if (Game::mouseLocked && !firstFrame)
-{
+    {
         RECT rect;
         GetWindowRect(Game::gameWindow, &rect);
         POINT center;
@@ -128,8 +130,8 @@ void FreeCam::Loop()
         float dy = float(mp.y - center.y);
 
         if (Game::cinematicMode) {
-            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
-            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
+            smoothed_dx = expDecay(smoothed_dx, dx, 2.5, Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 2.5, Game::deltaTime);
         } else {
             smoothed_dx = dx;
             smoothed_dy = dy;
@@ -140,7 +142,6 @@ void FreeCam::Loop()
 
         SetCursorPos(center.x, center.y);
     }
-
 
     // --- Calculate forward and right vectors ---
     vec3f forward = {
@@ -160,37 +161,21 @@ void FreeCam::Loop()
     vec3f up = forward.cross(right);
     up.normalize();
 
-    vec3f targetVel(0.0f, 0.0f, 0.0f);
+    // --- Direct (parented) movement: no acceleration / friction ---
+    vec3f moveDir(0, 0, 0);
 
-    // Movement keys
-    if (GetAsyncKeyState('W') & 0x8000) targetVel -= forward * mv;
-    if (GetAsyncKeyState('S') & 0x8000) targetVel += forward * mv;
-    if (GetAsyncKeyState('A') & 0x8000) targetVel -= right * mv;
-    if (GetAsyncKeyState('D') & 0x8000) targetVel += right * mv;
-    if (GetAsyncKeyState('R') & 0x8000) targetVel += up * mv;
-    if (GetAsyncKeyState('F') & 0x8000) targetVel -= up * mv;
+    if (GetAsyncKeyState('W') & 0x8000) moveDir -= forward;
+    if (GetAsyncKeyState('S') & 0x8000) moveDir += forward;
+    if (GetAsyncKeyState('A') & 0x8000) moveDir -= right;
+    if (GetAsyncKeyState('D') & 0x8000) moveDir += right;
+    if (GetAsyncKeyState('R') & 0x8000) moveDir += up;
+    if (GetAsyncKeyState('F') & 0x8000) moveDir -= up;
 
-    // Improved movement integration:
-    // - Move velocity toward target with a spring-like term scaled by accel and dt.
-    // - Apply multiplicative damping per-frame to remove residual motion.
-    // - This keeps consistent units (velocity in units/sec).
-    {
+    if (moveDir.lengthSq() > 0.0f)
+        moveDir.normalize();
 
-        // Multiplicative friction/damping: interpret `friction` as per-second damping strength.
-        // Compute a per-frame damping factor in [0,1].
-        float dampingFactor = 1.0f - friction * Game::deltaTime;
-        if (dampingFactor < 0.0f) dampingFactor = 0.0f;
-        velocity *= dampingFactor;
-        // Spring-style acceleration toward target
-        velocity += (targetVel - velocity) * accel * Game::deltaTime;
-    }
-
-    // Kill tiny drift (very small threshold)
-    if (velocity.lengthSq() < 1e-8f)
-        velocity.zero();
-
-    // --- Apply movement ---
-    transform[3] += velocity * Game::deltaTime;
+    // Immediate translation (parented camera behavior)
+    transform[3] += moveDir * mv * Game::deltaTime;
 
     mat3x4f rotY, rotX, rotZ, combined;
 

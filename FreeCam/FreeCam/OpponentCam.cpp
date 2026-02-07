@@ -132,8 +132,8 @@ void OrbitCam::Loop() {
         float dy = float(mp.y - center.y);
 
         if (Game::cinematicMode) {
-            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
-            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
+            smoothed_dx = expDecay(smoothed_dx, dx, 2., Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 2., Game::deltaTime);
         }
         else {
             smoothed_dx = dx;

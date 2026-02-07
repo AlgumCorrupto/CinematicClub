@@ -202,8 +202,8 @@ void ParentedCam::Loop()
         float dy = float(mp.y - center.y);
 
         if (Game::cinematicMode) {
-            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
-            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
+            smoothed_dx = expDecay(smoothed_dx, dx, 2.5, Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 2.5, Game::deltaTime);
         }
         else {
             smoothed_dx = dx;
@@ -238,15 +238,19 @@ void ParentedCam::Loop()
         camUp = u;
     }
 
-    // --- 5. Movement ---
-    velocity = { 0,0,0 };
-    if (GetAsyncKeyState('W') & 0x8000) velocity -= camForward * mv;
-    if (GetAsyncKeyState('S') & 0x8000) velocity += camForward * mv;
-    if (GetAsyncKeyState('A') & 0x8000) velocity -= camRight * mv;
-    if (GetAsyncKeyState('D') & 0x8000) velocity += camRight * mv;
-    if (GetAsyncKeyState('R') & 0x8000) velocity += camUp * mv;
-    if (GetAsyncKeyState('F') & 0x8000) velocity -= camUp * mv;
+    vec3f moveDir(0, 0, 0);
 
+    if (GetAsyncKeyState('W') & 0x8000) moveDir -= camForward;
+    if (GetAsyncKeyState('S') & 0x8000) moveDir += camForward;
+    if (GetAsyncKeyState('A') & 0x8000) moveDir -= camRight;
+    if (GetAsyncKeyState('D') & 0x8000) moveDir += camRight;
+    if (GetAsyncKeyState('R') & 0x8000) moveDir += camUp;
+    if (GetAsyncKeyState('F') & 0x8000) moveDir -= camUp;
+
+    if (moveDir.lengthSq() > 0.0f)
+        moveDir.normalize();
+
+    velocity = moveDir * mv;
     offset[3] += velocity;
 
     // --- 6. Build final camera matrix ---
