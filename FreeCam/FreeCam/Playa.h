@@ -40,6 +40,7 @@ public:
 
     static void IncrementMoveSpeed();
     static void DecrementMoveSpeed();
+	static float currentSpeed;
 
 	static void IncrementCurrentOpponent() {
 		currentOpponent = (currentOpponent + 1) % opponents.size();

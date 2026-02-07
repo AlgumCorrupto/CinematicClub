@@ -36,7 +36,7 @@ const float FreeCam::smoothing = 0.1f;  // smaller = smoother motion
 // --- Smooth movement variables ---
 vec3f FreeCam::velocity(0.0f, 0.0f, 0.0f);
 const float FreeCam::accel = 10.f;      // acceleration factor
-const float FreeCam::friction = 3.f;  // friction factor
+const float FreeCam::friction = 16.f;  // friction factor
 std::vector<size_t> FreeCam::opponents = {};
 unsigned char FreeCam::currentOpponent = 0;
 
@@ -44,6 +44,8 @@ float FreeCam::fov = 40.f; // degrees
 float mouseElapsed = 33.f;
 static bool firstFrame = true;
 static const float NO_DAMPING_SPEED = 10.0;
+float FreeCam::currentSpeed = 0.0f;
+static vec3f lastMoveDir(0, 0, 0);
 
 void FreeCam::Init(int cam_address)
 {
@@ -171,11 +173,23 @@ void FreeCam::Loop()
     if (GetAsyncKeyState('R') & 0x8000) moveDir += up;
     if (GetAsyncKeyState('F') & 0x8000) moveDir -= up;
 
-    if (moveDir.lengthSq() > 0.0f)
+    bool hasInput = moveDir.lengthSq() > 0.0f;
+    if (hasInput) {
         moveDir.normalize();
+        lastMoveDir = moveDir;
+    }
+    float targetSpeed = hasInput ? mv : 0.0f;
+
+    // critically damped exponential smoothing
+    float response = hasInput ? accel : friction;
+    currentSpeed += (targetSpeed - currentSpeed) * response * Game::deltaTime;
+
 
     // Immediate translation (parented camera behavior)
-    transform[3] += moveDir * mv * Game::deltaTime;
+    if (currentSpeed > 0.0001f)
+    {
+        transform[3] += lastMoveDir * currentSpeed * Game::deltaTime;
+    }
 
     mat3x4f rotY, rotX, rotZ, combined;
 
