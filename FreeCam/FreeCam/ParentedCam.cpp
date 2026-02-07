@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include "types.h"
 #include "mat3x4f.h"
+#include "mathfunc.h"
 #include <thread>
 #include <chrono>
 
@@ -25,7 +26,7 @@ mat3x4f ParentedCam::offset{};
 mat3x4f ParentedCam::targetTransform{};
 
 float ParentedCam::moveSpeed = 2.f; // units per frame
-float ParentedCam::mouseSensitivity = 0.002f; // radians per pixel
+float ParentedCam::mouseSensitivity = 3.3f; // radians per pixel
 
 float ParentedCam::yaw = 0.0f;
 float ParentedCam::pitch = 0.0f;
@@ -46,11 +47,10 @@ bool ParentedCam::rotateWithVehicle = true;
 float ParentedCam::mouseElapsed = 0.f;
 
 float ParentedCam::fov = 40.f; // degrees
+static bool firstFrame = true;
 
 void ParentedCam::Init(int cam_address)
 {
-
-
     for (int row = 0; row < 3; row++) {
         for (int col = 0; col < 3; col++) {
             transform[row][col] = PS2Memory::ReadEE<float>(
@@ -67,6 +67,7 @@ void ParentedCam::Init(int cam_address)
     if (opponents.size() < currentOpponent) currentOpponent = 0;
     printf("Found %d opponents\n", (int)opponents.size());
 	ParentedCam::SetOpponent(currentOpponent);
+    firstFrame = true;
 }
 
 void MakeLocalLookAt(mat3x4f& offset, const vec3f& forward)
@@ -141,176 +142,81 @@ void ParentedCam::SetOpponent(unsigned char index)
 }
 
 
-
 void ParentedCam::Loop()
 {
-	mouseElapsed += Game::deltaTime;
-    // Guard: if we have no opponents, don't attempt to index into the vector
-    if (opponents.empty()) {
-        return;
-    }
+    mouseElapsed += Game::deltaTime;
 
-    // Ensure currentOpponent is still valid (in case opponents changed)
-    if (currentOpponent >= opponents.size()) ParentedCam::SetOpponent(0);
+    if (opponents.empty()) return;
+    if (currentOpponent >= opponents.size()) SetOpponent(0);
 
-    // Use explicit int addresses when calling PS2Memory helpers to avoid implicit narrowing warnings.
     size_t opponentAddr = opponents[currentOpponent];
-    if (PS2Memory::ReadEE<unsigned int>(opponentAddr) != 0x00627630) {
+    if (PS2Memory::ReadEE<unsigned int>(opponentAddr) != 0x00627630)
         return;
-    }
 
-    // Read target transform
-    for (int row = 0; row < 4; row++) {
-        for (int col = 0; col < 3; col++) {
-            ParentedCam::targetTransform[row][col] = PS2Memory::ReadEE<float>(
-                opponentAddr + 0x10 + (row * 3 + col) * static_cast<int>(sizeof(float))
-            );
-        }
-    }
+    // --- 1. Read vehicle transform ---
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 3; c++)
+            targetTransform[r][c] =
+            PS2Memory::ReadEE<float>(opponentAddr + 0x10 + (r * 3 + c) * 4);
 
-    const float fovMultiplier = 25.f;
-    float boost = 1;
-    // boost by pressing shift
-    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) boost = 5.0f;
+    // Vehicle basis
+    vec3f vRight = targetTransform[0];
+    vec3f vUp = targetTransform[1];
+    vec3f vFwd = targetTransform[2];
+    vec3f vPos = targetTransform[3];
+
+    // --- 2. Handle input ---
+    float boost = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 5.0f : 1.0f;
     float mv = moveSpeed * boost * Game::deltaTime;
-    // move speed adjust
 
-    // Fix opponent cycling (safe now because we guard against empty)
-    if (Helpful::KeyPressedOnce('T')) {
-        if (currentOpponent == 0) ParentedCam::SetOpponent(static_cast<unsigned char>(opponents.size() - 1));
-        else ParentedCam::SetOpponent(--currentOpponent);
-    }
-    if (Helpful::KeyPressedOnce('Y')) {
-        ParentedCam::SetOpponent(static_cast<unsigned char>((currentOpponent + 1) % opponents.size()));
-    }
-    if (Helpful::KeyPressedOnce('G')) {
-        ParentedCam::rotateWithVehicle = !ParentedCam::rotateWithVehicle;
-    }
+    if (Helpful::KeyPressedOnce('T'))
+        SetOpponent((currentOpponent == 0 ? opponents.size() - 1 : currentOpponent - 1));
+    if (Helpful::KeyPressedOnce('Y'))
+        SetOpponent((currentOpponent + 1) % opponents.size());
+    if (Helpful::KeyPressedOnce('G'))
+        rotateWithVehicle = !rotateWithVehicle;
 
-    // mouse sensitivity adjust
-    if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) mouseSensitivity -= 0.0001f * Game::deltaTime;
-    if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) mouseSensitivity += 0.0001f * Game::deltaTime;
-    // fov adjust
-    if (GetAsyncKeyState('Z') & 0x8000) fov += fovMultiplier * Game::deltaTime;
-    if (GetAsyncKeyState('X') & 0x8000) fov -= fovMultiplier * Game::deltaTime;
+    if (GetAsyncKeyState('Z') & 0x8000) fov += 25.f * Game::deltaTime;
+    if (GetAsyncKeyState('X') & 0x8000) fov -= 25.f * Game::deltaTime;
+    if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
+    if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
 
-    if (GetAsyncKeyState('N') & 0x8000) 
-    { ParentedCam::DecrementMoveSpeed(); }
+    if (GetAsyncKeyState('O') & 0x8000) tilt = 0;
+    if (GetAsyncKeyState('Q') & 0x8000) tilt += 0.5f * Game::deltaTime;
+    if (GetAsyncKeyState('E') & 0x8000) tilt -= 0.5f * Game::deltaTime;
 
-    if (GetAsyncKeyState('M') & 0x8000) 
-    { ParentedCam::IncrementMoveSpeed();}
-
-    if (GetAsyncKeyState('O') & 0x8000) tilt = 0.0; // reset tilt
-    if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
-    if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
-
-    if (Game::mouseLocked == true && mouseElapsed > .033f) {
-		mouseElapsed= 0.f;
-        // --- Get window center ---
+    // --- 3. Mouse look ---
+    if (Game::mouseLocked && !firstFrame)
+    {
+        RECT rect;
+        GetWindowRect(Game::gameWindow, &rect);
         POINT center;
-        {
-            RECT rect;
-            GetWindowRect(Game::gameWindow, &rect);
-            center.x = (rect.right - rect.left) / 2;
-            center.y = (rect.bottom - rect.top) / 2;
-            ClientToScreen(Game::gameWindow, &center);
-        }
+        center.x = (rect.right - rect.left) / 2;
+        center.y = (rect.bottom - rect.top) / 2;
+        ClientToScreen(Game::gameWindow, &center);
 
-        // --- Read mouse position ---
-        POINT mousePos;
-        GetCursorPos(&mousePos);
+        POINT mp;
+        GetCursorPos(&mp);
 
-        // --- Delta from window center ---
-        float dx = static_cast<float>(mousePos.x - center.x);
-        float dy = static_cast<float>(mousePos.y - center.y);
+        float dx = float(mp.x - center.x);
+        float dy = float(mp.y - center.y);
 
-        // --- Smooth or raw ---
         if (Game::cinematicMode) {
-            smoothed_dx += (dx - smoothed_dx) * smoothing;
-            smoothed_dy += (dy - smoothed_dy) * smoothing;
+            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
         }
         else {
             smoothed_dx = dx;
             smoothed_dy = dy;
         }
 
-        // --- Apply rotation ---
-        yaw -= smoothed_dx * mouseSensitivity;
-        pitch -= smoothed_dy * mouseSensitivity;
+        yaw -= smoothed_dx * mouseSensitivity * Game::deltaTime;
+        pitch -= smoothed_dy * mouseSensitivity * Game::deltaTime;
 
-        // --- Reset cursor ---
         SetCursorPos(center.x, center.y);
     }
 
-    // --- Calculate forward and right vectors ---
-    vec3f forward = {
-        cosf(pitch) * sinf(yaw),
-        -sinf(pitch),
-        cosf(pitch) * cosf(yaw)
-    };
-    forward.normalize();
-
-    vec3f right = {
-        cosf(yaw),
-        0,
-        -sinf(yaw)
-    };
-    right.normalize();
-
-    vec3f up = forward.cross(right);
-
-    up.normalize();
-
-    vec3f targetVel(0.0f, 0.0f, 0.0f);
-    velocity *= 0.f;
-
-    // Movement keys
-    if (GetAsyncKeyState('W') & 0x8000) velocity -= forward * mv;
-    if (GetAsyncKeyState('S') & 0x8000) velocity += forward * mv;
-    if (GetAsyncKeyState('A') & 0x8000) velocity -= right * mv;
-    if (GetAsyncKeyState('D') & 0x8000) velocity += right * mv;
-    if (GetAsyncKeyState('R') & 0x8000) velocity += up * mv;
-    if (GetAsyncKeyState('F') & 0x8000) velocity -= up * mv;
-
-
-    // --- Apply movement ---
-    offset[3] += velocity;
-
-    mat3x4f rotY, rotX, rotZ, combined;
-
-    // --- Build yaw + pitch rotation first ---
-    rotation_y(rotY, yaw);
-    rotation_x(rotX, pitch);
-
-    // Combine yaw and pitch
-    mat3x4f rotYP;
-    mult(rotYP, rotX, rotY);
-
-    // --- Apply roll around forward axis ---
-    if (fabsf(tilt) > 0.0001f) {
-        float c = cosf(tilt);
-        float s = sinf(tilt);
-
-        // Rotate right & up around forward
-        vec3f newRight = right * c + up * s;
-        vec3f newUp = up * c - right * s;
-
-        right = newRight;
-        up = newUp;
-    }
-
-    // --- Rebuild final camera-local rotation matrix ---
-    combined[0] = right;   // camera local right basis
-    combined[1] = up;      // camera local up basis
-    combined[2] = forward; // camera local forward basis
-    // combined[3] is the local translation (offset), but we'll handle it explicitly below
-
-// --- Step 1: Vehicle basis ---
-    vec3f vehicleRight = targetTransform[0];
-    vec3f vehicleUp = targetTransform[1];
-    vec3f vehicleFwd = targetTransform[2];
-
-    // --- Step 2: Camera forward from yaw/pitch (after mouse) ---
+    // --- 4. Build clean camera basis once ---
     vec3f camForward = {
         cosf(pitch) * sinf(yaw),
         -sinf(pitch),
@@ -318,55 +224,71 @@ void ParentedCam::Loop()
     };
     camForward.normalize();
 
-    // --- Step 3: Camera right/up ---
     vec3f camRight = { cosf(yaw), 0, -sinf(yaw) };
+    camRight.normalize();
+
     vec3f camUp = camForward.cross(camRight).normalized();
 
-    // --- Step 4: Apply tilt around forward ---
-    if (fabsf(tilt) > 0.0001f)
-    {
-        float c = cosf(tilt);
-        float s = sinf(tilt);
-        vec3f newRight = camRight * c + camUp * s;
-        vec3f newUp = camUp * c - camRight * s;
-        camRight = newRight;
-        camUp = newUp;
+    // --- Apply roll ---
+    if (tilt != 0.f) {
+        float c = cosf(tilt), s = sinf(tilt);
+        vec3f r = camRight * c + camUp * s;
+        vec3f u = camUp * c - camRight * s;
+        camRight = r;
+        camUp = u;
     }
 
-    // --- Step 5: Transform to world space if vehicle-relative ---
-    vec3f worldRight, worldUp, worldForward, worldOffset;
+    // --- 5. Movement ---
+    velocity = { 0,0,0 };
+    if (GetAsyncKeyState('W') & 0x8000) velocity -= camForward * mv;
+    if (GetAsyncKeyState('S') & 0x8000) velocity += camForward * mv;
+    if (GetAsyncKeyState('A') & 0x8000) velocity -= camRight * mv;
+    if (GetAsyncKeyState('D') & 0x8000) velocity += camRight * mv;
+    if (GetAsyncKeyState('R') & 0x8000) velocity += camUp * mv;
+    if (GetAsyncKeyState('F') & 0x8000) velocity -= camUp * mv;
+
+    offset[3] += velocity;
+
+    // --- 6. Build final camera matrix ---
     if (rotateWithVehicle)
     {
-        worldRight = vehicleRight * camRight.x + vehicleUp * camRight.y + vehicleFwd * camRight.z;
-        worldUp = vehicleRight * camUp.x + vehicleUp * camUp.y + vehicleFwd * camUp.z;
-        worldForward = vehicleRight * camForward.x + vehicleUp * camForward.y + vehicleFwd * camForward.z;
+        // rotate offset into vehicle space
+        vec3f off =
+            vRight * offset[3].x +
+            vUp * offset[3].y +
+            vFwd * offset[3].z;
 
-        worldOffset = vehicleRight * offset[3].x +
-            vehicleUp * offset[3].y +
-            vehicleFwd * offset[3].z;
-
-        transform[0] = worldRight;
-        transform[1] = worldUp;
-        transform[2] = worldForward;
-        transform[3] = targetTransform[3] + worldOffset;
+        transform[0] = vRight * camRight.x + vUp * camRight.y + vFwd * camRight.z;
+        transform[1] = vRight * camUp.x + vUp * camUp.y + vFwd * camUp.z;
+        transform[2] = vRight * camForward.x + vUp * camForward.y + vFwd * camForward.z;
+        transform[3] = vPos + off;
     }
     else
     {
-        // Free camera
         transform[0] = camRight;
         transform[1] = camUp;
         transform[2] = camForward;
-        transform[3] = offset[3] + targetTransform[3];
+        transform[3] = vPos + offset[3];
     }
+    firstFrame = false;
 }
 
+
 void ParentedCam::IncrementMoveSpeed() {
-    moveSpeed += 25.f * Game::deltaTime;
+    float factor = 1.0f + 2.5f * Game::deltaTime;
+    moveSpeed *= factor;
+
+    // Optional: prevent getting stuck at zero
+    if (moveSpeed < 0.01f)
+        moveSpeed = 0.01f;
 }
 
 void ParentedCam::DecrementMoveSpeed() {
-    moveSpeed -= 25.f * Game::deltaTime;
-    if (moveSpeed < 0.00f) moveSpeed = 0.00f;
+    float factor = 1.0f - 2.5f * Game::deltaTime;
+    moveSpeed *= factor;
+
+    if (moveSpeed < 0.0f)
+        moveSpeed = 0.0f;
 }
 
 void ParentedCam::MoveCurrentVehToCamera() {

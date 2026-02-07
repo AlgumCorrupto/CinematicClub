@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include "types.h"
 #include "mat3x4f.h"
+#include "mathfunc.h"
 
 #include "CDK.h"
 
@@ -20,8 +21,8 @@ mat3x4f FreeCam::transform{};
 
 bool frozen = false;
 
-float FreeCam::moveSpeed = 25.f; // units per frame
-float FreeCam::mouseSensitivity = 0.002f; // radians per pixel
+float FreeCam::moveSpeed = 25.f;
+float FreeCam::mouseSensitivity = 3.3f; // radians per pixel
 
 float FreeCam::yaw = 0.0f;
 float FreeCam::pitch = 0.0f;
@@ -34,12 +35,14 @@ const float FreeCam::smoothing = 0.1f;  // smaller = smoother motion
 
 // --- Smooth movement variables ---
 vec3f FreeCam::velocity(0.0f, 0.0f, 0.0f);
-const float FreeCam::accel = 4.f;      // acceleration factor
-const float FreeCam::friction = 0.03f;  // friction factor
+const float FreeCam::accel = 10.f;      // acceleration factor
+const float FreeCam::friction = 3.f;  // friction factor
 std::vector<size_t> FreeCam::opponents = {};
 unsigned char FreeCam::currentOpponent = 0;
 
 float FreeCam::fov = 40.f; // degrees
+float mouseElapsed = 33.f;
+static bool firstFrame = true;
 
 void FreeCam::Init(int cam_address)
 {
@@ -52,7 +55,7 @@ void FreeCam::Init(int cam_address)
     }
     fov = 40.f;
 
-    yaw   = atan2f(transform[2][0], transform[2][2]);
+    yaw = atan2f(transform[2][0], transform[2][2]);
     pitch = atan2f(-transform[2][1], sqrtf(transform[2][0] * transform[2][0] + transform[2][2] * transform[2][2]));
 
     // --- Calculate forward and right vectors ---
@@ -75,8 +78,12 @@ void FreeCam::Init(int cam_address)
         up.dot(projectedUp)                 // cos component
     );
     opponents = Helpful::FindAllPatterns({ 0x00, 0x62, 0x76, 0x30 });
-	currentOpponent = 0;
+    currentOpponent = 0;
+    firstFrame = true;
 }
+
+
+
 
 void FreeCam::Loop()
 {
@@ -103,42 +110,37 @@ void FreeCam::Loop()
 	if (GetAsyncKeyState('O') & 0x8000) tilt = 0.0; // reset tilt
 	if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
 	if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
-    if(Game::mouseLocked == true){
-        // --- Get window center ---
+    mouseElapsed += Game::deltaTime;
+    // --- 3. Mouse look ---
+    if (Game::mouseLocked && !firstFrame)
+{
+        RECT rect;
+        GetWindowRect(Game::gameWindow, &rect);
         POINT center;
-        {
-            RECT rect;
-            GetWindowRect(Game::gameWindow, &rect);
-            center.x = (rect.right - rect.left) / 2;
-            center.y = (rect.bottom - rect.top) / 2;
-            ClientToScreen(Game::gameWindow, &center);
-        }
+        center.x = (rect.right - rect.left) / 2;
+        center.y = (rect.bottom - rect.top) / 2;
+        ClientToScreen(Game::gameWindow, &center);
 
-        // --- Read mouse position ---
-        POINT mousePos;
-        GetCursorPos(&mousePos);
+        POINT mp;
+        GetCursorPos(&mp);
 
-        // --- Delta from window center ---
-        float dx = static_cast<float>(mousePos.x - center.x);
-        float dy = static_cast<float>(mousePos.y - center.y);
+        float dx = float(mp.x - center.x);
+        float dy = float(mp.y - center.y);
 
-        // --- Smooth or raw ---
         if (Game::cinematicMode) {
-            smoothed_dx += (dx - smoothed_dx) * smoothing;
-            smoothed_dy += (dy - smoothed_dy) * smoothing;
-        }
-        else {
+            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
+        } else {
             smoothed_dx = dx;
             smoothed_dy = dy;
         }
 
-        // --- Apply rotation ---
-        yaw -= smoothed_dx * mouseSensitivity;
-        pitch -= smoothed_dy * mouseSensitivity;
+        yaw -= smoothed_dx * mouseSensitivity *  Game::deltaTime;
+        pitch -= smoothed_dy * mouseSensitivity * Game::deltaTime;
 
-        // --- Reset cursor ---
         SetCursorPos(center.x, center.y);
     }
+
 
     // --- Calculate forward and right vectors ---
     vec3f forward = {
@@ -156,7 +158,6 @@ void FreeCam::Loop()
     right.normalize();
 
     vec3f up = forward.cross(right);
-
     up.normalize();
 
     vec3f targetVel(0.0f, 0.0f, 0.0f);
@@ -169,17 +170,27 @@ void FreeCam::Loop()
     if (GetAsyncKeyState('R') & 0x8000) targetVel += up * mv;
     if (GetAsyncKeyState('F') & 0x8000) targetVel -= up * mv;
 
-    // --- Smooth velocity towards target ---
-    velocity += (targetVel - velocity) * accel * Game::deltaTime;
+    // Improved movement integration:
+    // - Move velocity toward target with a spring-like term scaled by accel and dt.
+    // - Apply multiplicative damping per-frame to remove residual motion.
+    // - This keeps consistent units (velocity in units/sec).
+    {
 
-    // --- Apply friction when no input ---
-    if (targetVel.lengthSq() < 0.0001f) {
-        velocity *= (1.0f - friction);
-        if (velocity.lengthSq() < 0.00001f) velocity.zero();
+        // Multiplicative friction/damping: interpret `friction` as per-second damping strength.
+        // Compute a per-frame damping factor in [0,1].
+        float dampingFactor = 1.0f - friction * Game::deltaTime;
+        if (dampingFactor < 0.0f) dampingFactor = 0.0f;
+        velocity *= dampingFactor;
+        // Spring-style acceleration toward target
+        velocity += (targetVel - velocity) * accel * Game::deltaTime;
     }
 
+    // Kill tiny drift (very small threshold)
+    if (velocity.lengthSq() < 1e-8f)
+        velocity.zero();
+
     // --- Apply movement ---
-    transform[3] += velocity;
+    transform[3] += velocity * Game::deltaTime;
 
     mat3x4f rotY, rotX, rotZ, combined;
 
@@ -210,15 +221,25 @@ void FreeCam::Loop()
     combined[2] = forward;
     combined[3] = transform[3]; // translation stays the same
     transform = combined;
+    firstFrame = false;
 }
 
+
 void FreeCam::IncrementMoveSpeed() {
-    moveSpeed += 2.5f * Game::deltaTime;
+    float factor = 1.0f + 2.5f * Game::deltaTime;
+    moveSpeed *= factor;
+
+    // Optional: prevent getting stuck at zero
+    if (moveSpeed < 0.01f)
+        moveSpeed = 0.01f;
 }
 
 void FreeCam::DecrementMoveSpeed() {
-	moveSpeed -= 2.5f * Game::deltaTime;
-	if (moveSpeed < 0.00f) moveSpeed = 0.00f;
+    float factor = 1.0f - 2.5f * Game::deltaTime;
+    moveSpeed *= factor;
+
+    if (moveSpeed < 0.0f)
+        moveSpeed = 0.0f;
 }
 
 void FreeCam::MoveCurrentVehToCamera() {

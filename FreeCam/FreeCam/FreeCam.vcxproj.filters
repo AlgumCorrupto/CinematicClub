@@ -63,6 +63,9 @@
     <ClInclude Include="ParentedCam.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="mathfunc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -102,6 +105,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ParentedCam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mathfunc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

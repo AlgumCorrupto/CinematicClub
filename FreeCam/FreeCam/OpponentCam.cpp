@@ -5,6 +5,7 @@
 #include "types.h"
 #include "mat3x4f.h"
 #include "Game.h"
+#include "mathfunc.h"
 
 #include "CDK.h"
 
@@ -15,7 +16,7 @@ using namespace sr2::math;
 std::vector<size_t> OrbitCam::opponents = {};
 mat3x4f OrbitCam::transform = {};
 
-float OrbitCam::mouseSensitivity = 0.002f;
+float OrbitCam::mouseSensitivity = 3.3;
 float OrbitCam::yaw = 0.0f;
 float OrbitCam::pitch = 0.0f;
 float OrbitCam::tilt = 0.0f;
@@ -33,6 +34,8 @@ float OrbitCam::polar = 0;
 float OrbitCam::azimuthal = 0;
 float OrbitCam::distance = 20.0f;
 float OrbitCam::fov = 40.f;
+static bool firstFrame = true;
+
 
 bool OrbitCam::Init(int cam_address)
 {
@@ -56,6 +59,8 @@ bool OrbitCam::Init(int cam_address)
     distance = 20.0f;
     polar = 0.0f;
     azimuthal = 0.0f;
+    firstFrame = true;
+
 
     return true;
 }
@@ -111,25 +116,24 @@ void OrbitCam::Loop() {
         }
     }
 
-    // Mouse look handling
-    if (Game::mouseLocked && mouseElapsed > .033f) {
-		mouseElapsed = 0.f;
-        POINT center;
+    if (Game::mouseLocked && !firstFrame)
+    {
         RECT rect;
         GetWindowRect(Game::gameWindow, &rect);
+        POINT center;
         center.x = (rect.right - rect.left) / 2;
         center.y = (rect.bottom - rect.top) / 2;
         ClientToScreen(Game::gameWindow, &center);
 
-        POINT mousePos;
-        GetCursorPos(&mousePos);
+        POINT mp;
+        GetCursorPos(&mp);
 
-        float dx = static_cast<float>(mousePos.x - center.x);
-        float dy = static_cast<float>(mousePos.y - center.y);
+        float dx = float(mp.x - center.x);
+        float dy = float(mp.y - center.y);
 
         if (Game::cinematicMode) {
-            smoothed_dx += (dx - smoothed_dx) * smoothing;
-            smoothed_dy += (dy - smoothed_dy) * smoothing;
+            smoothed_dx = expDecay(smoothed_dx, dx, 3.3, Game::deltaTime);
+            smoothed_dy = expDecay(smoothed_dy, dy, 3.3, Game::deltaTime);
         }
         else {
             smoothed_dx = dx;
@@ -137,8 +141,8 @@ void OrbitCam::Loop() {
         }
 
         // Update angles with proper spherical coordinates
-        polar -= smoothed_dx * mouseSensitivity;
-        azimuthal += smoothed_dy * mouseSensitivity;
+        polar -= smoothed_dx * mouseSensitivity * Game::deltaTime;
+        azimuthal += smoothed_dy * mouseSensitivity * Game::deltaTime;
 
         // Keep polar in [0, 2π) range to prevent precision issues
         const float PI = 3.14159265f;
@@ -199,4 +203,5 @@ void OrbitCam::Loop() {
         distance = distance + 25.f * Game::deltaTime;
         if (distance > 50.0f) distance = 50.0f;
     }
+    firstFrame = false;
 }

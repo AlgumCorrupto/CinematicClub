@@ -44,7 +44,7 @@ const unsigned int Game::fovInstruction = 0x0031F2A4;
 
 void Game::NextState() {
     // unfrozen -> opponent -> free -> unfrozen
-    switch(mode) {
+    switch (mode) {
     case Mode::unfrozen:
         Game::GetCamBase();
         if (OrbitCam::Init(Game::cam_base) == false) {
@@ -64,11 +64,11 @@ void Game::NextState() {
         break;
     case Mode::parent:
         Game::GetCamBase();
-        FreeCam::Init(Game::cam_base);
-        CameraFreeze();
+        CameraFreeze(); // <-- Freeze BEFORE reading cam_base
+        FreeCam::Init(Game::cam_base); // <-- Now cam_base has the correct live transform
         mode = Mode::free;
-		toSleep = 33.f;
-		break;
+        toSleep = 0.f;
+        break;
     case Mode::free:
         CameraUnfreeze();
         mode = Mode::unfrozen;
@@ -224,7 +224,6 @@ void Game::CameraFreeze() {
     Game::frozen = true;
 	Game::mouseLocked = true;
 
-	FreeCam::moveSpeed = 0.5f;
     // --- Get window center ---
     POINT center;
     {
