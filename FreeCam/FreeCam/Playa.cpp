@@ -46,42 +46,40 @@ static bool firstFrame = true;
 static const float NO_DAMPING_SPEED = 10.0;
 float FreeCam::currentSpeed = 0.0f;
 static vec3f lastMoveDir(0, 0, 0);
-
+static vec3f worldOrigin(0, 0, 0);
+static vec3f localPos(0, 0, 0);
 void FreeCam::Init(int cam_address)
 {
-    for (int row = 0; row < 4; row++) {        // rotation rows
-        for (int col = 0; col < 3; col++) {    // 3 rotation + 1 translation
+    // Read full transform
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 3; col++) {
             transform[row][col] = PS2Memory::ReadEE<float>(
                 cam_address + (row * 3 + col) * sizeof(float)
             );
         }
     }
-    fov = 40.f;
 
+    // Store absolute origin ONCE
+    worldOrigin = transform[3];
+
+    // Local camera space starts at zero
+    localPos = { 0.f, 0.f, 0.f };
+
+    // Orientation
     yaw = atan2f(transform[2][0], transform[2][2]);
-    pitch = atan2f(-transform[2][1], sqrtf(transform[2][0] * transform[2][0] + transform[2][2] * transform[2][2]));
-
-    // --- Calculate forward and right vectors ---
-    vec3f forward = {
-        cosf(pitch) * sinf(yaw),
-        -sinf(pitch),
-        cosf(pitch) * cosf(yaw)
-    };
-
-    vec3f up = transform[1]; // camera's up vector
-    vec3f worldUp = { 0, 1, 0 }; // world up
-
-    // Project worldUp onto the plane perpendicular to forward
-    vec3f projectedUp = worldUp - forward * forward.dot(worldUp);
-    projectedUp.normalize();
-
-    // Compute angle between camera up and projected world up
-    float tilt = atan2f(
-        forward.cross(up).dot(projectedUp), // sin component
-        up.dot(projectedUp)                 // cos component
+    pitch = atan2f(
+        -transform[2][1],
+        sqrtf(transform[2][0] * transform[2][0] +
+            transform[2][2] * transform[2][2])
     );
+
+    tilt = 0.f;
+    currentSpeed = 0.f;
+    lastMoveDir = { 0, 0, 0 };
+
     opponents = Helpful::FindAllPatterns({ 0x00, 0x62, 0x76, 0x30 });
     currentOpponent = 0;
+
     firstFrame = true;
 }
 
@@ -108,6 +106,11 @@ void FreeCam::Loop()
 	if (GetAsyncKeyState('O') & 0x8000) tilt = 0.0; // reset tilt
 	if (GetAsyncKeyState('Q') & 0x8000) tilt += .5f * Game::deltaTime; // roll left
 	if (GetAsyncKeyState('E') & 0x8000) tilt -= .5f * Game::deltaTime; // roll right
+    if (Helpful::KeyPressedOnce(VK_HOME)) { 
+        FreeCam::SetOrigin();
+        printf("origin set at (%f, %f, %f)\n", transform[3][0], transform[3][1], transform[3][2]);
+    }
+
     mouseElapsed += Game::deltaTime;
 
     // --- Mouse look ---
@@ -166,7 +169,7 @@ void FreeCam::Loop()
     vec3f up = forward.cross(right);
     up.normalize();
 
-    // --- Direct (parented) movement: no acceleration / friction ---
+    // --- Movement in LOCAL space only ---
     vec3f moveDir(0, 0, 0);
 
     if (GetAsyncKeyState('W') & 0x8000) moveDir -= forward;
@@ -176,26 +179,20 @@ void FreeCam::Loop()
     if (GetAsyncKeyState('R') & 0x8000) moveDir += up;
     if (GetAsyncKeyState('F') & 0x8000) moveDir -= up;
 
-
-    bool hasInput = moveDir.lengthSq() > 0.0f;
+    bool hasInput = moveDir.lengthSq() > 0.f;
     if (hasInput) {
         moveDir.normalize();
         lastMoveDir = moveDir;
     }
-    float targetSpeed = hasInput ? mv : 0.0f;
 
-    if (moveSpeed < 1.0f) {
-		transform[3] += lastMoveDir * targetSpeed * Game::deltaTime;
-    }
-    else {
-        // critically damped exponential smoothing
-        float response = hasInput ? accel : friction;
-        currentSpeed += (targetSpeed - currentSpeed) * response * Game::deltaTime;
+    float targetSpeed = hasInput ? mv : 0.f;
 
+    float response = hasInput ? accel : friction;
+    currentSpeed += (targetSpeed - currentSpeed) * response * Game::deltaTime;
 
-        // Immediate translation (parented camera behavior)
-        if (currentSpeed > 0.0001f)
-            transform[3] += lastMoveDir * currentSpeed * Game::deltaTime;
+    // Integrate in LOCAL space
+    if (currentSpeed > 0.00001f) {
+        localPos += lastMoveDir * currentSpeed * Game::deltaTime;
     }
 
 
@@ -222,11 +219,14 @@ void FreeCam::Loop()
         up = newUp;
     }
 
-    // --- Rebuild final rotation matrix ---
+    // --- Final camera transform ---
     combined[0] = right;
     combined[1] = up;
     combined[2] = forward;
-    combined[3] = transform[3]; // translation stays the same
+
+    // Convert local  world ONCE
+    combined[3] = worldOrigin + localPos;
+
     transform = combined;
     firstFrame = false;
 }
@@ -247,6 +247,11 @@ void FreeCam::DecrementMoveSpeed() {
 
     if (moveSpeed < 0.0f)
         moveSpeed = 0.0f;
+}
+
+void FreeCam::SetOrigin() {
+    worldOrigin = transform[3];
+    localPos = { 0.f, 0.f, 0.f };
 }
 
 void FreeCam::MoveCurrentVehToCamera() {

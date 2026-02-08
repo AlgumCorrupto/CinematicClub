@@ -48,6 +48,8 @@ public:
 		currentOpponent = (currentOpponent == 0) ? opponents.size() - 1 : currentOpponent - 1;
 	}
 
+	static void SetOrigin();
+
 	static void MoveCurrentVehToCamera();
 };
 
