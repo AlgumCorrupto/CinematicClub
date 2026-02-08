@@ -30,6 +30,7 @@ public:
     static std::vector<float> fov_bases;
     static sr2::mat3x4f cameraTransform;
     static float fov;
+    static float mouseSensitivity;
 
     static void Init();             // initializes the game
     static void GetCamBase();       // fetches the car 3x4 matrix base address

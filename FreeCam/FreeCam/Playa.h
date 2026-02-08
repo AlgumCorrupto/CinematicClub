@@ -15,7 +15,6 @@ public:
 	static unsigned char currentOpponent;
 
     static float moveSpeed;
-	static float mouseSensitivity;
 
     // State
     static float velX, velY, velZ; // velocity components

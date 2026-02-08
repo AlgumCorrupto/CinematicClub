@@ -26,7 +26,6 @@ mat3x4f ParentedCam::offset{};
 mat3x4f ParentedCam::targetTransform{};
 
 float ParentedCam::moveSpeed = 2.f; // units per frame
-float ParentedCam::mouseSensitivity = 3.3f; // radians per pixel
 
 float ParentedCam::yaw = 0.0f;
 float ParentedCam::pitch = 0.0f;
@@ -181,6 +180,7 @@ void ParentedCam::Loop()
     if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
     if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
 
+
     if (GetAsyncKeyState('O') & 0x8000) tilt = 0;
     if (GetAsyncKeyState('Q') & 0x8000) tilt += 0.5f * Game::deltaTime;
     if (GetAsyncKeyState('E') & 0x8000) tilt -= 0.5f * Game::deltaTime;
@@ -210,8 +210,8 @@ void ParentedCam::Loop()
             smoothed_dy = dy;
         }
 
-        yaw -= smoothed_dx * mouseSensitivity * Game::deltaTime;
-        pitch -= smoothed_dy * mouseSensitivity * Game::deltaTime;
+        yaw -= smoothed_dx * Game::mouseSensitivity * Game::deltaTime;
+        pitch -= smoothed_dy * Game::mouseSensitivity * Game::deltaTime;
 
         SetCursorPos(center.x, center.y);
     }

@@ -22,7 +22,6 @@ mat3x4f FreeCam::transform{};
 bool frozen = false;
 
 float FreeCam::moveSpeed = 25.f;
-float FreeCam::mouseSensitivity = 3.3f; // radians per pixel
 
 float FreeCam::yaw = 0.0f;
 float FreeCam::pitch = 0.0f;
@@ -86,8 +85,6 @@ void FreeCam::Init(int cam_address)
 }
 
 
-
-
 void FreeCam::Loop()
 {
     const float fovMultiplier = 25.f;
@@ -99,9 +96,6 @@ void FreeCam::Loop()
     if (GetAsyncKeyState('N') & 0x8000) DecrementMoveSpeed();
     if (GetAsyncKeyState('M') & 0x8000) IncrementMoveSpeed();
 
-	// mouse sensitivity adjust
-	if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) mouseSensitivity -= 0.0001f * Game::deltaTime;
-	if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) mouseSensitivity += 0.0001f * Game::deltaTime;
 	// fov adjust
     if (GetAsyncKeyState('Z') & 0x8000) fov += fovMultiplier * Game::deltaTime;
     if (GetAsyncKeyState('X') & 0x8000) fov -= fovMultiplier * Game::deltaTime;
@@ -139,8 +133,8 @@ void FreeCam::Loop()
             smoothed_dy = dy;
         }
 
-        yaw -= smoothed_dx * mouseSensitivity *  Game::deltaTime;
-        pitch -= smoothed_dy * mouseSensitivity * Game::deltaTime;
+        yaw -= smoothed_dx * Game::mouseSensitivity *  Game::deltaTime;
+        pitch -= smoothed_dy * Game::mouseSensitivity * Game::deltaTime;
 
         SetCursorPos(center.x, center.y);
     }

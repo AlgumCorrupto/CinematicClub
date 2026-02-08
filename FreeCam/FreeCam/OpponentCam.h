@@ -20,7 +20,6 @@ public:
     static std::vector<size_t> opponents;
     static uint8_t currentOpponent;
 
-    static float mouseSensitivity;
 
     // State
     static float velX, velY, velZ; // velocity components

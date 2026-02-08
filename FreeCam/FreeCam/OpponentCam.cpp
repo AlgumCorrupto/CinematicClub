@@ -16,7 +16,6 @@ using namespace sr2::math;
 std::vector<size_t> OrbitCam::opponents = {};
 mat3x4f OrbitCam::transform = {};
 
-float OrbitCam::mouseSensitivity = 3.3;
 float OrbitCam::yaw = 0.0f;
 float OrbitCam::pitch = 0.0f;
 float OrbitCam::tilt = 0.0f;
@@ -141,8 +140,8 @@ void OrbitCam::Loop() {
         }
 
         // Update angles with proper spherical coordinates
-        polar -= smoothed_dx * mouseSensitivity * Game::deltaTime;
-        azimuthal += smoothed_dy * mouseSensitivity * Game::deltaTime;
+        polar -= smoothed_dx * Game::mouseSensitivity * Game::deltaTime;
+        azimuthal += smoothed_dy * Game::mouseSensitivity * Game::deltaTime;
 
         // Keep polar in [0, 2π) range to prevent precision issues
         const float PI = 3.14159265f;

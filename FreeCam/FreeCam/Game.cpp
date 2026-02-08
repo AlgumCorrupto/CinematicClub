@@ -26,6 +26,7 @@ POINT Game::lockCenter;
 mat3x4f Game::cameraTransform;
 Game::Mode Game::mode = Game::Mode::unfrozen;
 float Game::fov = 40.f;
+float Game::mouseSensitivity = 3.3f; // NEW: central mouse sensitivity variable
 float Game::toSleep = 33.f;
 using clockq = std::chrono::steady_clock;
 static auto lastTime = clockq::now();
@@ -91,6 +92,22 @@ void Game::Init() {
     PS2Memory::WriteEE<unsigned int>(unusedMemory2 + 6 * sizeof(unsigned int), 0x00000000);
     PCSX2::recResetEE_stub();
 }
+void IncrementMouseSpeed() {
+    float factor = 1.0f + 2.5f * Game::deltaTime;
+    Game::mouseSensitivity *= factor;
+
+    // Optional: prevent getting stuck at zero
+    if (Game::mouseSensitivity < 0.01f)
+        Game::mouseSensitivity = 0.01f;
+}
+
+void DecrementMouseSpeed() {
+    float factor = 1.0f - 2.5f * Game::deltaTime;
+    Game::mouseSensitivity *= factor;
+
+    if (Game::mouseSensitivity < 0.0f)
+        Game::mouseSensitivity = 0.0f;
+}
 
 void Game::Loop() {
 
@@ -124,6 +141,8 @@ void Game::Loop() {
     std::chrono::duration<float> delta = now - lastTime;
     lastTime = now;
     Game::deltaTime = delta.count(); // seconds since last frame
+    if (GetAsyncKeyState(VK_OEM_COMMA) & 0x8000) DecrementMouseSpeed();
+    if (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) IncrementMouseSpeed();
 
     if (frozen) {
         if (!cam_base) return; // sanity check
