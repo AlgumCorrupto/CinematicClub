@@ -176,6 +176,7 @@ void FreeCam::Loop()
     if (GetAsyncKeyState('R') & 0x8000) moveDir += up;
     if (GetAsyncKeyState('F') & 0x8000) moveDir -= up;
 
+
     bool hasInput = moveDir.lengthSq() > 0.0f;
     if (hasInput) {
         moveDir.normalize();
@@ -183,16 +184,20 @@ void FreeCam::Loop()
     }
     float targetSpeed = hasInput ? mv : 0.0f;
 
-    // critically damped exponential smoothing
-    float response = hasInput ? accel : friction;
-    currentSpeed += (targetSpeed - currentSpeed) * response * Game::deltaTime;
-
-
-    // Immediate translation (parented camera behavior)
-    if (currentSpeed > 0.0001f)
-    {
-        transform[3] += lastMoveDir * currentSpeed * Game::deltaTime;
+    if (moveSpeed < 1.0f) {
+		transform[3] += lastMoveDir * targetSpeed * Game::deltaTime;
     }
+    else {
+        // critically damped exponential smoothing
+        float response = hasInput ? accel : friction;
+        currentSpeed += (targetSpeed - currentSpeed) * response * Game::deltaTime;
+
+
+        // Immediate translation (parented camera behavior)
+        if (currentSpeed > 0.0001f)
+            transform[3] += lastMoveDir * currentSpeed * Game::deltaTime;
+    }
+
 
     mat3x4f rotY, rotX, rotZ, combined;
 
