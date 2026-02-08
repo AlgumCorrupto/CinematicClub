@@ -5,6 +5,7 @@
 #include "types.h"
 #include "mat3x4f.h"
 #include "mathfunc.h"
+#include <algorithm>
 
 #include "CDK.h"
 
@@ -112,11 +113,13 @@ void FreeCam::Loop()
     // --- Mouse look ---
     if (Game::mouseLocked && !firstFrame)
     {
-        RECT rect;
-        GetWindowRect(Game::gameWindow, &rect);
-        POINT center;
-        center.x = (rect.right - rect.left) / 2;
-        center.y = (rect.bottom - rect.top) / 2;
+        RECT crect;
+        GetClientRect(Game::gameWindow, &crect);
+
+        POINT center{
+            crect.right / 2,
+            crect.bottom / 2
+        };
         ClientToScreen(Game::gameWindow, &center);
 
         POINT mp;
@@ -125,16 +128,22 @@ void FreeCam::Loop()
         float dx = float(mp.x - center.x);
         float dy = float(mp.y - center.y);
 
+        // Clamp insane spikes (VERY IMPORTANT)
+        dx = std::clamp(dx, -100.0f, 100.0f);
+        dy = std::clamp(dy, -100.0f, 100.0f);
+        float dt = min(Game::deltaTime, .0015f);
+
         if (Game::cinematicMode) {
-            smoothed_dx = expDecay(smoothed_dx, dx, 2.5, Game::deltaTime);
-            smoothed_dy = expDecay(smoothed_dy, dy, 2.5, Game::deltaTime);
-        } else {
+            smoothed_dx = expDecay(smoothed_dx, dx, 2.5f, dt);
+            smoothed_dy = expDecay(smoothed_dy, dy, 2.5f, dt);
+        }
+        else {
             smoothed_dx = dx;
             smoothed_dy = dy;
         }
 
-        yaw -= smoothed_dx * Game::mouseSensitivity *  Game::deltaTime;
-        pitch -= smoothed_dy * Game::mouseSensitivity * Game::deltaTime;
+        yaw -= smoothed_dx * Game::mouseSensitivity * dt;
+        pitch -= smoothed_dy * Game::mouseSensitivity * dt;
 
         SetCursorPos(center.x, center.y);
     }

@@ -26,7 +26,7 @@ POINT Game::lockCenter;
 mat3x4f Game::cameraTransform;
 Game::Mode Game::mode = Game::Mode::unfrozen;
 float Game::fov = 40.f;
-float Game::mouseSensitivity = 3.3f; // NEW: central mouse sensitivity variable
+float Game::mouseSensitivity = 3.3;
 float Game::toSleep = 33.f;
 using clockq = std::chrono::steady_clock;
 static auto lastTime = clockq::now();

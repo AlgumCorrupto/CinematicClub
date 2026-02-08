@@ -115,13 +115,17 @@ void OrbitCam::Loop() {
         }
     }
 
+
+    // --- Mouse look ---
     if (Game::mouseLocked && !firstFrame)
     {
-        RECT rect;
-        GetWindowRect(Game::gameWindow, &rect);
-        POINT center;
-        center.x = (rect.right - rect.left) / 2;
-        center.y = (rect.bottom - rect.top) / 2;
+        RECT crect;
+        GetClientRect(Game::gameWindow, &crect);
+
+        POINT center{
+            crect.right / 2,
+            crect.bottom / 2
+        };
         ClientToScreen(Game::gameWindow, &center);
 
         POINT mp;
@@ -130,9 +134,14 @@ void OrbitCam::Loop() {
         float dx = float(mp.x - center.x);
         float dy = float(mp.y - center.y);
 
+        // Clamp insane spikes (VERY IMPORTANT)
+        dx = std::clamp(dx, -100.0f, 100.0f);
+        dy = std::clamp(dy, -100.0f, 100.0f);
+        float dt = min(Game::deltaTime, .0015f);
+
         if (Game::cinematicMode) {
-            smoothed_dx = expDecay(smoothed_dx, dx, 2., Game::deltaTime);
-            smoothed_dy = expDecay(smoothed_dy, dy, 2., Game::deltaTime);
+            smoothed_dx = expDecay(smoothed_dx, dx, 2.5f, dt);
+            smoothed_dy = expDecay(smoothed_dy, dy, 2.5f, dt);
         }
         else {
             smoothed_dx = dx;
@@ -149,11 +158,11 @@ void OrbitCam::Loop() {
         if (polar > TWO_PI) polar -= TWO_PI;
         if (polar < 0) polar += TWO_PI;
 
-        // Clamp azimuthal to prevent flipping (slightly less than π/2 to avoid gimbal lock)
-        azimuthal = clamp(azimuthal, -1.4f, 1.4f);
+        // Clamp azimuthal to prevent flipping (slightly
 
         SetCursorPos(center.x, center.y);
     }
+
 
     // Get target position
     vec3f targetPos = { targetTransform[3][0], targetTransform[3][1], targetTransform[3][2] };
